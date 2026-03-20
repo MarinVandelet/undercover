@@ -449,12 +449,16 @@ function advanceTurn(room) {
     return;
   }
 
-  room.currentTurnIndex = 0;
   room.round += 1;
 
   if (room.round > room.wordRounds) {
     room.phase = 'voting';
+    room.currentTurnIndex = 0;
+    return;
   }
+
+  // Rotate the first speaker each word round: P1 -> P2 -> P3 ...
+  room.currentTurnIndex = (room.round - 1) % room.order.length;
 }
 
 function abortGameIfTooFewPlayers(room) {
