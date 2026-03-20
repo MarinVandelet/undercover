@@ -1,0 +1,32 @@
+{
+  "name": "undercover",
+  "version": "1.0.0",
+  "description": "Undercover multiplayer game (Vite + React + Socket.IO)",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "nodemon server/index.js",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "start": "node server/index.js"
+  },
+  "keywords": [
+    "undercover",
+    "vite",
+    "react",
+    "socket.io"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "framer-motion": "^12.38.0",
+    "multer": "^2.1.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.1.14"
+  }
+}

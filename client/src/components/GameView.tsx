@@ -1,0 +1,250 @@
+import { useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
+import { FastForward, Volume2, VolumeX } from 'lucide-react';
+import type { Clue, RoomState, RoleInfo } from '../types';
+
+const BASE_URL = import.meta.env.BASE_URL || '/';
+function withBase(pathname: string) {
+  const clean = pathname.replace(/^\/+/, '');
+  return `${BASE_URL}${clean}`;
+}
+
+type GameViewProps = {
+  room: RoomState;
+  roleInfo: RoleInfo | null;
+  currentSpeakerName: string | null;
+  previousClue: Clue | null;
+  clueText: string;
+  setClueText: (value: string) => void;
+  onSubmitClue: (event: FormEvent) => void;
+  clueTimeLeft: number;
+  clueProgressPercent: number;
+  selfId: string;
+  cluesByPlayer: Map<string, Clue[]>;
+  onVote: (targetId: string) => void;
+  onForceVoting: () => void;
+  onNextManche: () => void;
+  onBackToLobby: () => void;
+  audioEnabled: boolean;
+  onToggleAudio: () => void;
+  audioVolume: number;
+  onChangeAudioVolume: (value: number) => void;
+};
+
+export function GameView({
+  room,
+  roleInfo,
+  currentSpeakerName,
+  previousClue,
+  clueText,
+  setClueText,
+  onSubmitClue,
+  clueTimeLeft,
+  clueProgressPercent,
+  selfId,
+  cluesByPlayer,
+  onVote,
+  onForceVoting,
+  onNextManche,
+  onBackToLobby,
+  audioEnabled,
+  onToggleAudio,
+  audioVolume,
+  onChangeAudioVolume
+}: GameViewProps) {
+  const [selectedVoteId, setSelectedVoteId] = useState('');
+  const roundPoints = new Map<string, number>();
+  (room.result?.pointsAwarded || []).forEach((award) => {
+    roundPoints.set(award.playerId, (roundPoints.get(award.playerId) || 0) + award.points);
+  });
+
+  useEffect(() => {
+    if (room.phase !== 'voting') {
+      setSelectedVoteId('');
+    }
+  }, [room.phase, room.roomCode]);
+
+  function submitVote(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedVoteId || room.hasVoted) return;
+    onVote(selectedVoteId);
+  }
+
+  const densityClass =
+    room.players.length <= 4 ? 'density-large' : room.players.length <= 7 ? 'density-medium' : 'density-compact';
+
+  return (
+    <main className="clue-fullscreen">
+      <div className="clue-progress-wrap">
+        <div className="clue-progress-bar" style={{ width: `${clueProgressPercent}%` }} />
+      </div>
+
+      <header className="clue-topbar">
+        <div className="clue-top-left">
+          <img className="clue-header-logo" src={withBase('/logo_blanc.png')} alt="Undercover" />
+        </div>
+        <div className="clue-word-hero" aria-live="polite">
+          {room.phase === 'ended' ? (
+            <div className="result-hero">
+              <p className="undercover-line"><strong>Undercover:</strong> {room.result?.undercoverName || 'Inconnu'}</p>
+              <p className="undercover-line"><strong>Mot undercover:</strong> {room.result?.undercoverWord || '-'}</p>
+              <p className="civil-line"><strong>Mot civil:</strong> {room.result?.civilianWord || '-'}</p>
+            </div>
+          ) : (
+            <span>{roleInfo?.word || '...'}</span>
+          )}
+        </div>
+        <div className="clue-meta">
+          {room.phase === 'clues' ? <span>{clueTimeLeft}s</span> : null}
+          <span>
+            {room.phase === 'clues'
+              ? `Tour: ${currentSpeakerName || '...'}`
+              : room.phase === 'voting'
+                ? 'Vote en cours'
+                : 'Manche terminee'}
+          </span>
+          <span>Votes: {room.votesCount}/{room.requiredVotes}</span>
+          {room.isHost && room.phase === 'clues' ? (
+            <button className="force-vote-btn" type="button" onClick={onForceVoting}>
+              <FastForward size={16} />
+              <span>Passer au vote</span>
+            </button>
+          ) : null}
+          <div className={`audio-tools ${audioEnabled ? 'is-on' : 'is-off'}`}>
+            <button
+              className="audio-toggle-btn"
+              type="button"
+              onClick={onToggleAudio}
+              aria-label={audioEnabled ? 'Couper le son' : 'Activer le son'}
+              title={audioEnabled ? 'Son ON' : 'Son OFF'}
+            >
+              {audioEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            </button>
+            {audioEnabled ? (
+              <input
+                className="audio-range"
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={audioVolume}
+                onChange={(event) => onChangeAudioVolume(Number(event.target.value))}
+                aria-label="Volume"
+              />
+            ) : null}
+          </div>
+        </div>
+      </header>
+
+      <section className={`clue-users-top ${densityClass}`}>
+        {room.players.map((player) => {
+          const entries = cluesByPlayer.get(player.id) || [];
+          return (
+            <article
+              className={`clue-user-card ${player.id === room.currentSpeakerId ? 'active-turn' : ''} ${player.id === selfId ? 'me' : ''}`}
+              key={player.id}
+            >
+              <img className="clue-player-avatar" src={player.avatarUrl} alt={`Avatar ${player.name}`} />
+              <h3>{player.name}</h3>
+              <div className="clue-user-words">
+                {entries.length === 0 && <p className="empty-word">Aucun mot</p>}
+                {entries.map((clue) => (
+                  <p key={clue.id}>{clue.text}</p>
+                ))}
+              </div>
+            </article>
+          );
+        })}
+      </section>
+
+      <footer className="clue-input-dock">
+        <div className="clue-input-card">
+          {room.phase === 'clues' ? (
+            <>
+              <p>Indice precedent: {previousClue ? `${previousClue.playerName}: ${previousClue.text}` : 'Aucun'}</p>
+              {room.canSubmitClue ? (
+                <form onSubmit={onSubmitClue} className="clue-dock-form">
+                  <input
+                    placeholder="Tape ton mot indice"
+                    value={clueText}
+                    onChange={(event) => setClueText(event.target.value)}
+                    maxLength={80}
+                  />
+                  <button className="primary" type="submit">Envoyer</button>
+                </form>
+              ) : (
+                <p>Attends ton tour, passage auto a la fin du chrono.</p>
+              )}
+            </>
+          ) : room.phase === 'voting' ? (
+            <form onSubmit={submitVote} className="vote-dock-form">
+              <p>Choisis un joueur puis confirme ton vote.</p>
+              <div className="vote-pick-grid">
+                {room.players
+                  .filter((player) => player.id !== selfId)
+                  .map((player) => (
+                    <button
+                      key={player.id}
+                      type="button"
+                      className={`vote-pick-btn ${selectedVoteId === player.id ? 'selected' : ''}`}
+                      onClick={() => setSelectedVoteId(player.id)}
+                      disabled={room.hasVoted || player.id === selfId}
+                    >
+                      <img className="avatarMini" src={player.avatarUrl} alt={`Avatar ${player.name}`} />
+                      <span>{player.name}</span>
+                    </button>
+                  ))}
+              </div>
+              <button className="primary" type="submit" disabled={!selectedVoteId || room.hasVoted}>
+                {room.hasVoted ? 'Vote confirme' : 'Confirmer mon vote'}
+              </button>
+            </form>
+          ) : (
+            <div className="round-result-panel">
+              <h3>Resultat de manche</h3>
+              {room.result?.reason ? <p>{room.result.reason}</p> : null}
+              <p>
+                Vote final: <strong>{room.result?.suspectedName || 'Aucun'}</strong>
+              </p>
+              <p>
+                {room.result?.undercoverCaught ? 'Undercover demasque' : 'Undercover gagnant'}
+              </p>
+
+              <div className="scoreboard-grid">
+                {(room.result?.scoreBoard || [])
+                  .slice()
+                  .sort((a, b) => b.score - a.score)
+                  .map((entry) => (
+                    <div className="score-row" key={entry.playerId}>
+                      <span>{entry.playerName}</span>
+                      <div className="score-right">
+                        {roundPoints.get(entry.playerId) ? (
+                          <span className="score-gain">+{roundPoints.get(entry.playerId)}</span>
+                        ) : null}
+                        <strong>{entry.score}</strong>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              {room.isHost ? (
+                <div className="result-actions">
+                  {!room.sessionFinished && room.canNextManche ? (
+                    <button className="primary" type="button" onClick={onNextManche}>
+                      Passer a la prochaine manche
+                    </button>
+                  ) : null}
+                  <button type="button" onClick={onBackToLobby}>
+                    Retour au lobby
+                  </button>
+                </div>
+              ) : (
+                <p className="waiting-host-text">En attente de l'hôte pour la suite.</p>
+              )}
+            </div>
+          )}
+        </div>
+      </footer>
+    </main>
+  );
+}
