@@ -37,6 +37,8 @@ const AUDIO_PREFS_KEY = 'undercover_audio_prefs_v1';
 const AUDIO_PREFS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PLAYER_NAME_KEY = 'undercover_player_name_v1';
 const PLAYER_NAME_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const SESSION_KEY = 'undercover_session_token_v1';
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 function randomDefaultAvatar() {
   return DEFAULT_AVATARS[Math.floor(Math.random() * DEFAULT_AVATARS.length)];
@@ -122,6 +124,39 @@ function sanitizeName(name: string) {
   return name.trim().replace(/\s+/g, ' ').slice(0, 18);
 }
 
+function loadSessionToken() {
+  try {
+    const raw = window.localStorage.getItem(SESSION_KEY);
+    if (!raw) return '';
+    const parsed = JSON.parse(raw) as { value?: string; expiresAt?: number };
+    if (!parsed.expiresAt || Date.now() > parsed.expiresAt) {
+      window.localStorage.removeItem(SESSION_KEY);
+      return '';
+    }
+    return typeof parsed.value === 'string' ? parsed.value : '';
+  } catch (_error) {
+    return '';
+  }
+}
+
+function saveSessionToken(token: string) {
+  try {
+    if (!token) {
+      window.localStorage.removeItem(SESSION_KEY);
+      return;
+    }
+    window.localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        value: token,
+        expiresAt: Date.now() + SESSION_TTL_MS
+      })
+    );
+  } catch (_error) {
+    // no-op when storage is unavailable
+  }
+}
+
 export default function App() {
   const [playerName, setPlayerName] = useState(() => loadSavedPlayerName());
   const [joinCode, setJoinCode] = useState('');
@@ -139,6 +174,7 @@ export default function App() {
   const [nowTick, setNowTick] = useState(Date.now());
   const [audioEnabled, setAudioEnabled] = useState(() => loadAudioPrefs().audioEnabled);
   const [audioVolume, setAudioVolume] = useState(() => loadAudioPrefs().audioVolume);
+  const [sessionToken, setSessionToken] = useState(() => loadSessionToken());
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
@@ -166,6 +202,8 @@ export default function App() {
       setRoom(null);
       setRoleInfo(null);
       setClueText('');
+      setSessionToken('');
+      saveSessionToken('');
       setStatus('La room a ete supprimee.');
     }
 
@@ -179,6 +217,22 @@ export default function App() {
       socket.off('room:deleted', onRoomDeleted);
     };
   }, []);
+
+  useEffect(() => {
+    function onConnect() {
+      if (!sessionToken || room) return;
+      socket.emit('room:resume', { sessionToken }, (ack: Ack) => {
+        if (ack?.ok) {
+          setStatus(`Session reprise dans la room ${ack.roomCode}.`);
+        }
+      });
+    }
+
+    socket.on('connect', onConnect);
+    return () => {
+      socket.off('connect', onConnect);
+    };
+  }, [sessionToken, room]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowTick(Date.now()), 60);
@@ -198,6 +252,10 @@ export default function App() {
   useEffect(() => {
     savePlayerName(playerName);
   }, [playerName]);
+
+  useEffect(() => {
+    saveSessionToken(sessionToken);
+  }, [sessionToken]);
 
   useEffect(() => {
     if (!bgMusicRef.current) {
@@ -389,13 +447,14 @@ export default function App() {
     const name = validateName();
     if (!name) return;
 
-    const ack = await emitAck('room:create', { name, avatarUrl: selectedDefaultAvatar });
+    const ack = await emitAck('room:create', { name, avatarUrl: selectedDefaultAvatar, sessionToken });
     if (!ack.ok) {
       setStatus(ack.error || 'Creation impossible.');
       return;
     }
 
     setRoleInfo(null);
+    if (ack.sessionToken) setSessionToken(ack.sessionToken);
     setStatus(`Room ${ack.roomCode} crée.`);
 
     if (pendingUploadFile) {
@@ -413,13 +472,14 @@ export default function App() {
       return;
     }
 
-    const ack = await emitAck('room:join', { name, roomCode, avatarUrl: selectedDefaultAvatar });
+    const ack = await emitAck('room:join', { name, roomCode, avatarUrl: selectedDefaultAvatar, sessionToken });
     if (!ack.ok) {
       setStatus(ack.error || 'Impossible de rejoindre.');
       return;
     }
 
     setRoleInfo(null);
+    if (ack.sessionToken) setSessionToken(ack.sessionToken);
     setStatus(`Tu as rejoint ${roomCode}.`);
 
     if (pendingUploadFile) {
@@ -550,6 +610,8 @@ export default function App() {
     setRoom(null);
     setRoleInfo(null);
     setClueText('');
+    setSessionToken('');
+    saveSessionToken('');
     setStatus('Tu as quitte la room.');
   }
 
@@ -562,6 +624,8 @@ export default function App() {
     setRoom(null);
     setRoleInfo(null);
     setClueText('');
+    setSessionToken('');
+    saveSessionToken('');
     setStatus('Room supprimee.');
   }
 

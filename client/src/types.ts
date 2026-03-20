@@ -76,6 +76,7 @@ export type Ack = {
   ok: boolean;
   error?: string;
   roomCode?: string;
+  sessionToken?: string;
 };
 
 export type UploadResponse = {
