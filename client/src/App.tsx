@@ -377,7 +377,7 @@ export default function App() {
       if (pendingUploadPreview) URL.revokeObjectURL(pendingUploadPreview);
       setPendingUploadFile(null);
       setPendingUploadPreview(null);
-      setStatus('Avatar importe. Suppression auto dans 20 minutes.');
+      setStatus('Avatar importe. Suppression auto dans 3 heures.');
     } catch (_error) {
       setStatus('Echec upload avatar.');
     } finally {

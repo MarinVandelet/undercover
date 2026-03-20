@@ -18,7 +18,7 @@ const MAX_WORD_ROUNDS = 8;
 const DEFAULT_MANCHES = 3;
 const MIN_MANCHES = 1;
 const MAX_MANCHES = Math.max(1, Math.min(10, WORD_PAIRS.length));
-const AVATAR_TTL_MS = 20 * 60 * 1000;
+const AVATAR_TTL_MS = 3 * 60 * 60 * 1000;
 const CLUE_TURN_DURATION_MS = 25 * 1000;
 
 function normalizeBasePath(input) {
