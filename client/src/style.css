@@ -301,12 +301,12 @@ body {
 }
 
 .clue-users-top {
-  padding: 40px 24px 18px;
+  padding: 72px 24px 18px;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-content: flex-start;
-  gap: 22px 26px;
+  gap: 28px 38px;
 }
 
 .clue-user-card {
@@ -316,9 +316,9 @@ body {
   background: transparent;
   min-height: 0;
   width: 100%;
-  max-width: 220px;
+  max-width: 210px;
   min-width: 150px;
-  flex: 0 1 calc((100% - 104px) / 5);
+  flex: 0 1 calc((100% - 190px) / 6);
   display: grid;
   justify-items: center;
   text-align: center;
