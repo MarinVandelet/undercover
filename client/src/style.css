@@ -971,7 +971,7 @@ small {
   .clue-users-top.density-medium,
   .clue-users-top.density-compact {
     display: grid;
-    padding: 8px 14px 12px;
+    padding: 24px 14px 12px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 14px;
     justify-items: center;
@@ -1078,6 +1078,7 @@ small {
   .clue-users-top.density-medium,
   .clue-users-top.density-compact {
     display: grid;
+    padding-top: 30px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
   }
