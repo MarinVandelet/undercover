@@ -69,8 +69,7 @@ const uploadAvatar = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 3 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowed.includes(file.mimetype)) {
+    if (!String(file.mimetype || '').startsWith('image/')) {
       cb(new Error('Format image non supporte.'));
       return;
     }
