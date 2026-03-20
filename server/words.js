@@ -585,6 +585,18 @@
   { civilian: 'Lucario (Pokémon)', undercover: 'Zoroark (Pokémon)' },
   { civilian: 'Gengar (Pokémon)', undercover: 'Ectoplasma (Pokémon)' },
 
+  // Adulte
+  { civilian: 'Missionnaire', undercover: 'Levrette' },
+  { civilian: 'Fellation', undercover: 'Cunnilingus' },
+  { civilian: 'Préliminaires', undercover: 'Pénétration' },
+  { civilian: 'Sexto', undercover: 'Nude' },
+  { civilian: 'Lingerie', undercover: 'Nuisette' },
+  { civilian: 'Vibromasseur', undercover: 'Godemichet' },
+  { civilian: 'Capote', undercover: 'Préservatif' },
+  { civilian: 'Libido', undercover: 'Désir' },
+  { civilian: 'Domination', undercover: 'Soumission' },
+  { civilian: 'Plan cul', undercover: 'Coup d\'un soir' },
+
   // Marques de voiture
   { civilian: 'BMW', undercover: 'Audi' },
   { civilian: 'Mercedes', undercover: 'Lexus' },
