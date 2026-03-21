@@ -148,6 +148,11 @@ export default function App() {
   const selfId = room?.selfId || socket.id || '';
 
   useEffect(() => {
+    // Cleanup legacy key from the old auto-resume system.
+    window.localStorage.removeItem('undercover_session_token_v1');
+  }, []);
+
+  useEffect(() => {
     function onRoomUpdate(next: RoomState) {
       setRoom(next);
       setLobbyWordRounds(next.wordRounds);
