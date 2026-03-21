@@ -52,7 +52,7 @@ export function HomeView({
           onChange={(event) => onPlayerNameChange(event.target.value)}
           maxLength={18}
         />
-        <button className="primary" type="button" onClick={onCreateRoom}>Creer une room</button>
+        <button className="primary" type="button" onClick={onCreateRoom}>Créer une room</button>
 
         <label htmlFor="code">Code room (4 chiffres)</label>
         <input
