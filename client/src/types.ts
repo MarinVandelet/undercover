@@ -73,6 +73,7 @@ export type RoomState = {
   undercoverCountSetting: number;
   misterWhiteCountSetting: number;
   selfIsMisterWhite: boolean;
+  selfWord?: string | null;
   selfLoverName: string | null;
   selfIsAlive: boolean;
   selfId: string;

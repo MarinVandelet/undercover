@@ -218,6 +218,11 @@ export default function App() {
       setRoom(next);
       setLobbyMatchCount(next.totalManches);
       setResumeHint(true);
+      if (next.phase === 'lobby') {
+        setRoleInfo(null);
+      } else {
+        setRoleInfo({ word: next.selfWord ?? null });
+      }
       const me = next.players.find((p) => p.id === socket.id);
       if (me && DEFAULT_AVATARS.includes(me.avatarUrl)) {
         setSelectedDefaultAvatar(me.avatarUrl);

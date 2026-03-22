@@ -658,6 +658,15 @@ function toPublicState(room, requesterId) {
       ? room.loversPair.find((id) => id !== requesterId) || null
       : null;
   const selfLoverName = selfLoverId ? room.players.get(selfLoverId)?.name || null : null;
+  const requesterRole = getRoleOfPlayer(room, requesterId);
+  const selfWord =
+    room.phase === 'lobby'
+      ? null
+      : requesterRole === 'misterwhite'
+        ? null
+        : requesterRole === 'undercover'
+          ? room.secret?.undercoverWord || null
+          : room.secret?.civilianWord || null;
 
   const state = {
     roomCode: room.code,
@@ -692,6 +701,7 @@ function toPublicState(room, requesterId) {
     selfIsMisterWhite: Array.isArray(room.misterWhiteIds)
       ? room.misterWhiteIds.includes(requesterId)
       : room.misterWhiteId === requesterId,
+    selfWord,
     selfLoverName,
     selfIsAlive: requesterAlive,
     selfId: requesterId,
