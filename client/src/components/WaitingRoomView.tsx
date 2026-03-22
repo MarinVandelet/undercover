@@ -4,9 +4,10 @@ import type { RoomState } from '../types';
 type WaitingRoomViewProps = {
   room: RoomState;
   lobbyMatchCount: number;
-  lobbyWordRounds: number;
   onAdjustMatchCount: (delta: number) => void;
-  onAdjustWordRounds: (delta: number) => void;
+  onAdjustCivilianCount: (delta: number) => void;
+  onAdjustUndercoverCount: (delta: number) => void;
+  onAdjustMisterWhiteCount: (delta: number) => void;
   onToggleMisterWhite: () => void;
   onToggleLovers: () => void;
   onApplySettings: () => void;
@@ -16,9 +17,10 @@ type WaitingRoomViewProps = {
 export function WaitingRoomView({
   room,
   lobbyMatchCount,
-  lobbyWordRounds,
   onAdjustMatchCount,
-  onAdjustWordRounds,
+  onAdjustCivilianCount,
+  onAdjustUndercoverCount,
+  onAdjustMisterWhiteCount,
   onToggleMisterWhite,
   onToggleLovers,
   onApplySettings,
@@ -57,21 +59,69 @@ export function WaitingRoomView({
 
           <div className="setting-tile">
             <div>
-              <small>Tours de mots</small>
-              <p>{lobbyWordRounds}</p>
+              <small>Civils</small>
+              <p>{room.civilianCountSetting}</p>
             </div>
             <div className="stepper">
               <button
                 className="stepper-btn"
                 type="button"
-                onClick={() => onAdjustWordRounds(-1)}
+                onClick={() => onAdjustCivilianCount(-1)}
               >
                 <Minus size={16} />
               </button>
               <button
                 className="stepper-btn"
                 type="button"
-                onClick={() => onAdjustWordRounds(1)}
+                onClick={() => onAdjustCivilianCount(1)}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div className="setting-tile">
+            <div>
+              <small>Undercovers</small>
+              <p>{room.undercoverCountSetting}</p>
+            </div>
+            <div className="stepper">
+              <button
+                className="stepper-btn"
+                type="button"
+                onClick={() => onAdjustUndercoverCount(-1)}
+              >
+                <Minus size={16} />
+              </button>
+              <button
+                className="stepper-btn"
+                type="button"
+                onClick={() => onAdjustUndercoverCount(1)}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div className="setting-tile">
+            <div>
+              <small>Mister White</small>
+              <p>{room.misterWhiteCountSetting}</p>
+            </div>
+            <div className="stepper">
+              <button
+                className="stepper-btn"
+                type="button"
+                onClick={() => onAdjustMisterWhiteCount(-1)}
+                disabled={!room.enableMisterWhite}
+              >
+                <Minus size={16} />
+              </button>
+              <button
+                className="stepper-btn"
+                type="button"
+                onClick={() => onAdjustMisterWhiteCount(1)}
+                disabled={!room.enableMisterWhite}
               >
                 <Plus size={16} />
               </button>

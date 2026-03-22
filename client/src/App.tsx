@@ -127,6 +127,7 @@ export default function App() {
   const [playerName, setPlayerName] = useState(() => loadSavedPlayerName());
   const [joinCode, setJoinCode] = useState('');
   const [clueText, setClueText] = useState('');
+  const [misterWhiteGuessText, setMisterWhiteGuessText] = useState('');
   const [room, setRoom] = useState<RoomState | null>(null);
   const [roleInfo, setRoleInfo] = useState<RoleInfo | null>(null);
   const [status, setStatus] = useState('Choisis un pseudo, puis crée ou rejoins une room.');
@@ -136,7 +137,6 @@ export default function App() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lobbyMatchCount, setLobbyMatchCount] = useState(3);
-  const [lobbyWordRounds, setLobbyWordRounds] = useState(3);
   const [nowTick, setNowTick] = useState(Date.now());
   const [audioEnabled, setAudioEnabled] = useState(() => loadAudioPrefs().audioEnabled);
   const [audioVolume, setAudioVolume] = useState(() => loadAudioPrefs().audioVolume);
@@ -155,7 +155,6 @@ export default function App() {
   useEffect(() => {
     function onRoomUpdate(next: RoomState) {
       setRoom(next);
-      setLobbyWordRounds(next.wordRounds);
       setLobbyMatchCount(next.totalManches);
       const me = next.players.find((p) => p.id === socket.id);
       if (me && DEFAULT_AVATARS.includes(me.avatarUrl)) {
@@ -224,7 +223,11 @@ export default function App() {
     const music = bgMusicRef.current;
     if (!music) return;
 
-    const isInGame = room?.phase === 'clues' || room?.phase === 'voting' || room?.phase === 'ended';
+    const isInGame =
+      room?.phase === 'clues'
+      || room?.phase === 'voting'
+      || room?.phase === 'misterwhite_guess'
+      || room?.phase === 'ended';
     if (audioEnabled && isInGame) {
       void music.play().catch(() => {});
       return;
@@ -470,6 +473,21 @@ export default function App() {
     setStatus('Vote enregistre.');
   }
 
+  async function submitMisterWhiteGuess(event: FormEvent) {
+    event.preventDefault();
+    const word = misterWhiteGuessText.trim();
+    if (!word) return;
+
+    const ack = await emitAck('game:misterWhiteGuess', { word });
+    if (!ack.ok) {
+      setStatus(ack.error || 'Mot refuse.');
+      return;
+    }
+
+    setMisterWhiteGuessText('');
+    setStatus('Proposition envoyee.');
+  }
+
   async function forceVoting() {
     const ack = await emitAck('game:forceVoting');
     if (!ack.ok) {
@@ -492,29 +510,20 @@ export default function App() {
   async function applyLobbySettings() {
     if (!room || !room.isHost) return;
     const nextMatchCount = Math.max(1, Math.min(12, lobbyMatchCount));
-    const nextRounds = Math.max(1, Math.min(8, lobbyWordRounds));
-
-    const [matchAck, roundsAck] = await Promise.all([
-      emitAck('room:updateMatchCount', { matchCount: nextMatchCount }),
-      emitAck('room:updateWordRounds', { wordRounds: nextRounds })
-    ]);
+    const matchAck = await emitAck('room:updateMatchCount', { matchCount: nextMatchCount });
 
     if (!matchAck.ok) {
       setStatus(matchAck.error || 'Impossible de modifier les manches.');
       return;
     }
-    if (!roundsAck.ok) {
-      setStatus(roundsAck.error || 'Impossible de modifier les tours de mots.');
-      return;
-    }
-
-    setStatus(`Reglages appliques: ${nextMatchCount} manches, ${nextRounds} tours.`);
+    setStatus(`Reglages appliques: ${nextMatchCount} manches.`);
   }
 
   async function toggleMisterWhite() {
     if (!room || !room.isHost || room.phase !== 'lobby') return;
     const ack = await emitAck('room:updateSpecialRoles', {
-      enableMisterWhite: !room.enableMisterWhite
+      enableMisterWhite: !room.enableMisterWhite,
+      misterWhiteCount: !room.enableMisterWhite ? Math.max(1, room.misterWhiteCountSetting || 0) : 0
     });
     if (!ack.ok) {
       setStatus(ack.error || 'Impossible de modifier Mister White.');
@@ -535,6 +544,53 @@ export default function App() {
     setStatus(`Amoureux ${room.enableLovers ? 'desactive' : 'active'}.`);
   }
 
+  async function adjustUndercoverCount(delta: number) {
+    if (!room || !room.isHost || room.phase !== 'lobby') return;
+    const maxUndercover = Math.max(0, room.players.length - room.misterWhiteCountSetting - 1);
+    const next = Math.max(0, Math.min(maxUndercover, room.undercoverCountSetting + delta));
+    if (next === room.undercoverCountSetting) return;
+
+    const ack = await emitAck('room:updateSpecialRoles', { undercoverCount: next });
+    if (!ack.ok) {
+      setStatus(ack.error || 'Impossible de modifier le nombre d undercovers.');
+      return;
+    }
+    setStatus(`Undercovers: ${next}.`);
+  }
+
+  async function adjustMisterWhiteCount(delta: number) {
+    if (!room || !room.isHost || room.phase !== 'lobby') return;
+    if (!room.enableMisterWhite) return;
+    const maxMisterWhite = Math.max(0, room.players.length - room.undercoverCountSetting - 1);
+    const next = Math.max(0, Math.min(maxMisterWhite, room.misterWhiteCountSetting + delta));
+    if (next === room.misterWhiteCountSetting) return;
+
+    const ack = await emitAck('room:updateSpecialRoles', { misterWhiteCount: next });
+    if (!ack.ok) {
+      setStatus(ack.error || 'Impossible de modifier le nombre de mister white.');
+      return;
+    }
+    setStatus(`Mister White: ${next}.`);
+  }
+
+  async function adjustCivilianCount(delta: number) {
+    if (!room || !room.isHost || room.phase !== 'lobby') return;
+    const currentCivilian = Math.max(
+      0,
+      room.players.length - room.undercoverCountSetting - room.misterWhiteCountSetting
+    );
+    const maxCivilian = Math.max(1, room.players.length - room.misterWhiteCountSetting);
+    const nextCivilian = Math.max(1, Math.min(maxCivilian, currentCivilian + delta));
+    if (nextCivilian === currentCivilian) return;
+
+    const ack = await emitAck('room:updateSpecialRoles', { civilianCount: nextCivilian });
+    if (!ack.ok) {
+      setStatus(ack.error || 'Impossible de modifier le nombre de civils.');
+      return;
+    }
+    setStatus(`Civils: ${nextCivilian}.`);
+  }
+
   async function adjustLobbyMatchCount(delta: number) {
     if (!room || !room.isHost || room.phase !== 'lobby') return;
     const nextMatchCount = Math.max(1, Math.min(12, lobbyMatchCount + delta));
@@ -548,21 +604,6 @@ export default function App() {
       return;
     }
     setStatus(`Manches mises a jour: ${nextMatchCount}.`);
-  }
-
-  async function adjustLobbyWordRounds(delta: number) {
-    if (!room || !room.isHost || room.phase !== 'lobby') return;
-    const nextRounds = Math.max(1, Math.min(8, lobbyWordRounds + delta));
-    if (nextRounds === lobbyWordRounds) return;
-
-    setLobbyWordRounds(nextRounds);
-    const ack = await emitAck('room:updateWordRounds', { wordRounds: nextRounds });
-    if (!ack.ok) {
-      setStatus(ack.error || 'Impossible de modifier les tours de mots.');
-      setLobbyWordRounds(room.wordRounds);
-      return;
-    }
-    setStatus(`Tours de mots mis a jour: ${nextRounds}.`);
   }
 
   async function backToLobby() {
@@ -695,7 +736,10 @@ export default function App() {
     });
   }
 
-  if (room && (room.phase === 'clues' || room.phase === 'voting' || room.phase === 'ended')) {
+  if (
+    room
+    && (room.phase === 'clues' || room.phase === 'voting' || room.phase === 'misterwhite_guess' || room.phase === 'ended')
+  ) {
     return (
       <GameView
         room={room}
@@ -705,6 +749,9 @@ export default function App() {
         clueText={clueText}
         setClueText={setClueText}
         onSubmitClue={submitClue}
+        misterWhiteGuessText={misterWhiteGuessText}
+        setMisterWhiteGuessText={setMisterWhiteGuessText}
+        onSubmitMisterWhiteGuess={submitMisterWhiteGuess}
         clueTimeLeft={clueTimeLeft}
         clueProgressPercent={clueProgressPercent}
         selfId={selfId}
@@ -767,8 +814,7 @@ export default function App() {
               <h2>Room de {roomHostName}</h2>
               <div className="meta-line">
                 <span>Manche {room.currentManche}/{room.totalManches}</span>
-                <span>Tours de mots {room.wordRounds}</span>
-                <span>Joueurs {room.players.length}</span>
+                <span>Joueurs {room.aliveCount}/{room.players.length}</span>
               </div>
               <div className="top-actions">
                 <button className="copy-code-btn" type="button" onClick={copyRoomCode}>
@@ -791,9 +837,10 @@ export default function App() {
                 <WaitingRoomView
                   room={room}
                   lobbyMatchCount={lobbyMatchCount}
-                  lobbyWordRounds={lobbyWordRounds}
                   onAdjustMatchCount={adjustLobbyMatchCount}
-                  onAdjustWordRounds={adjustLobbyWordRounds}
+                  onAdjustCivilianCount={adjustCivilianCount}
+                  onAdjustUndercoverCount={adjustUndercoverCount}
+                  onAdjustMisterWhiteCount={adjustMisterWhiteCount}
                   onToggleMisterWhite={toggleMisterWhite}
                   onToggleLovers={toggleLovers}
                   onApplySettings={applyLobbySettings}

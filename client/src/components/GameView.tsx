@@ -17,6 +17,9 @@ type GameViewProps = {
   clueText: string;
   setClueText: (value: string) => void;
   onSubmitClue: (event: FormEvent) => void;
+  misterWhiteGuessText: string;
+  setMisterWhiteGuessText: (value: string) => void;
+  onSubmitMisterWhiteGuess: (event: FormEvent) => void;
   clueTimeLeft: number;
   clueProgressPercent: number;
   selfId: string;
@@ -39,6 +42,9 @@ export function GameView({
   clueText,
   setClueText,
   onSubmitClue,
+  misterWhiteGuessText,
+  setMisterWhiteGuessText,
+  onSubmitMisterWhiteGuess,
   clueTimeLeft,
   clueProgressPercent,
   selfId,
@@ -113,6 +119,8 @@ export function GameView({
               ? `Tour: ${currentSpeakerName || '...'}`
               : room.phase === 'voting'
                 ? 'Vote en cours'
+                : room.phase === 'misterwhite_guess'
+                  ? 'Mister White devine'
                 : 'Manche terminee'}
           </span>
           <span>Votes: {room.votesCount}/{room.requiredVotes}</span>
@@ -153,13 +161,14 @@ export function GameView({
           const entries = cluesByPlayer.get(player.id) || [];
           return (
             <article
-              className={`clue-user-card ${player.id === room.currentSpeakerId ? 'active-turn' : ''} ${player.id === selfId ? 'me' : ''}`}
+              className={`clue-user-card ${player.id === room.currentSpeakerId ? 'active-turn' : ''} ${player.id === selfId ? 'me' : ''} ${player.isAlive ? '' : 'eliminated'}`}
               key={player.id}
             >
               <img className="clue-player-avatar" src={player.avatarUrl} alt={`Avatar ${player.name}`} />
               <h3>{player.name}</h3>
               <div className="clue-user-words">
-                {entries.length === 0 && <p className="empty-word">Aucun mot</p>}
+                {!player.isAlive ? <p className="empty-word">Elimine</p> : null}
+                {entries.length === 0 && player.isAlive && <p className="empty-word">Aucun mot</p>}
                 {entries.map((clue) => (
                   <p key={clue.id}>{clue.text}</p>
                 ))}
@@ -184,6 +193,8 @@ export function GameView({
                   />
                   <button className="primary" type="submit">Envoyer</button>
                 </form>
+              ) : !room.selfIsAlive ? (
+                <p>Tu es elimine: tu observes la manche.</p>
               ) : (
                 <p>Attends ton tour, passage auto a la fin du chrono.</p>
               )}
@@ -193,7 +204,7 @@ export function GameView({
               <p>Choisis un joueur puis confirme ton vote.</p>
               <div className="vote-pick-grid">
                 {room.players
-                  .filter((player) => player.id !== selfId)
+                  .filter((player) => player.id !== selfId && player.isAlive)
                   .map((player) => (
                     <button
                       key={player.id}
@@ -207,10 +218,36 @@ export function GameView({
                     </button>
                   ))}
               </div>
-              <button className="primary" type="submit" disabled={!selectedVoteId || room.hasVoted}>
+              <button className="primary" type="submit" disabled={!selectedVoteId || room.hasVoted || !room.selfIsAlive}>
                 {room.hasVoted ? 'Vote confirme' : 'Confirmer mon vote'}
               </button>
+              {!room.selfIsAlive ? <p>Tu es elimine: tu ne peux plus voter.</p> : null}
             </form>
+          ) : room.phase === 'misterwhite_guess' ? (
+            room.canSubmitMisterWhiteGuess ? (
+              <form onSubmit={onSubmitMisterWhiteGuess} className="vote-dock-form">
+                <p>Tu es Mister White: tente de deviner le mot civil.</p>
+                <input
+                  placeholder="Ton mot..."
+                  value={misterWhiteGuessText}
+                  onChange={(event) => setMisterWhiteGuessText(event.target.value)}
+                  maxLength={80}
+                />
+                <button className="primary" type="submit" disabled={!misterWhiteGuessText.trim()}>
+                  Valider le mot
+                </button>
+              </form>
+            ) : (
+              <div>
+                <p>{room.pendingMisterWhiteGuess?.playerName || 'Mister White'} tente de deviner le mot...</p>
+                {room.lastMisterWhiteGuess ? (
+                  <p>
+                    Proposition: <strong>{room.lastMisterWhiteGuess.guess}</strong>{' '}
+                    ({room.lastMisterWhiteGuess.correct ? 'correct' : 'incorrect'})
+                  </p>
+                ) : null}
+              </div>
+            )
           ) : (
             <div className="round-result-panel">
               <h3>Resultat de manche</h3>

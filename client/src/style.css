@@ -358,6 +358,15 @@ body {
   transform: translateY(-2px);
 }
 
+.clue-user-card.eliminated {
+  opacity: 0.55;
+  filter: grayscale(0.35);
+}
+
+.clue-user-card.eliminated h3 {
+  color: #ffad66;
+}
+
 .clue-user-words {
   display: grid;
   gap: 8px;

@@ -4,6 +4,7 @@ export type Player = {
   isHost: boolean;
   avatarUrl: string;
   score: number;
+  isAlive: boolean;
 };
 
 export type Clue = {
@@ -21,6 +22,7 @@ export type Result = {
   suspectedId: string | null;
   suspectedName: string | null;
   undercoverCaught: boolean;
+  winnerTeam?: 'civilians' | 'undercovers';
   civilianWord: string | null;
   undercoverWord: string | null;
   pointsAwarded?: {
@@ -46,13 +48,12 @@ export type Result = {
 
 export type RoomState = {
   roomCode: string;
-  phase: 'lobby' | 'clues' | 'voting' | 'ended';
+  phase: 'lobby' | 'clues' | 'voting' | 'misterwhite_guess' | 'ended';
   round: number;
-  maxRounds: number;
   totalManches: number;
   currentManche: number;
   sessionFinished: boolean;
-  wordRounds: number;
+  aliveCount: number;
   players: Player[];
   clues: Clue[];
   currentSpeakerId: string | null;
@@ -61,13 +62,28 @@ export type RoomState = {
   requiredVotes: number;
   canStart: boolean;
   canSubmitClue: boolean;
+  canSubmitMisterWhiteGuess: boolean;
   isHost: boolean;
   enableMisterWhite: boolean;
   enableLovers: boolean;
+  civilianCountSetting: number;
+  undercoverCountSetting: number;
+  misterWhiteCountSetting: number;
   selfIsMisterWhite: boolean;
   selfLoverName: string | null;
+  selfIsAlive: boolean;
   selfId: string;
   hasVoted: boolean;
+  pendingMisterWhiteGuess: {
+    playerId: string;
+    playerName: string;
+  } | null;
+  lastMisterWhiteGuess: {
+    playerId: string;
+    guess: string;
+    correct: boolean;
+    targetWord: string;
+  } | null;
   canNextManche: boolean;
   selfAvatarExpiresAt: number | null;
   result?: Result;

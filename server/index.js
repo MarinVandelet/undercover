@@ -12,9 +12,6 @@ const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || '*';
 const BASE_PATH = normalizeBasePath(process.env.BASE_PATH || '');
 const API_PREFIX = `${BASE_PATH}/api`;
 const SOCKET_PATH = `${BASE_PATH}/socket.io`;
-const DEFAULT_WORD_ROUNDS = 3;
-const MIN_WORD_ROUNDS = 1;
-const MAX_WORD_ROUNDS = 8;
 const DEFAULT_MANCHES = 3;
 const MIN_MANCHES = 1;
 const MAX_MANCHES = Math.max(1, Math.min(10, WORD_PAIRS.length));
@@ -117,20 +114,6 @@ function pickRandomDistinct(array, count) {
   return picks;
 }
 
-function getRoleDistribution(playerCount, enableMisterWhite) {
-  if (!enableMisterWhite) {
-    return { misterWhiteCount: 0, undercoverCount: 1 };
-  }
-
-  if (playerCount <= 3) {
-    return { misterWhiteCount: 1, undercoverCount: 0 };
-  }
-  if (playerCount <= 6) {
-    return { misterWhiteCount: 1, undercoverCount: 1 };
-  }
-  return { misterWhiteCount: 1, undercoverCount: 2 };
-}
-
 function pickWordPairForRoom(room) {
   if (!room.usedWordPairIndexes) {
     room.usedWordPairIndexes = new Set();
@@ -172,12 +155,54 @@ function sanitizeClue(text) {
   return text.trim().replace(/\s+/g, ' ').slice(0, 80);
 }
 
+function sanitizeGuessWord(text) {
+  if (typeof text !== 'string') return '';
+  return text.trim().replace(/\s+/g, ' ').slice(0, 80);
+}
+
 function sanitizeBoundedInt(value, min, max, fallback) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   if (!Number.isFinite(parsed)) return fallback;
   if (parsed < min) return min;
   if (parsed > max) return max;
   return parsed;
+}
+
+function normalizeWordForCompare(word) {
+  return String(word || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function levenshteinDistance(a, b) {
+  const m = a.length;
+  const n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i += 1) dp[i][0] = i;
+  for (let j = 0; j <= n; j += 1) dp[0][j] = j;
+  for (let i = 1; i <= m; i += 1) {
+    for (let j = 1; j <= n; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return dp[m][n];
+}
+
+function isGuessCloseEnough(guess, target) {
+  const a = normalizeWordForCompare(guess);
+  const b = normalizeWordForCompare(target);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const maxLen = Math.max(a.length, b.length);
+  const tolerance = maxLen <= 5 ? 1 : maxLen <= 9 ? 2 : 3;
+  return levenshteinDistance(a, b) <= tolerance;
 }
 
 function sanitizeDefaultAvatar(avatarUrl) {
@@ -242,7 +267,94 @@ function removePlayerUpload(player) {
 }
 
 function getCurrentSpeakerId(room) {
-  return room.order[room.currentTurnIndex] || null;
+  return room.turnOrder?.[room.currentTurnIndex] || null;
+}
+
+function getAliveIds(room) {
+  return room.order.filter((id) => !room.eliminatedIds?.has(id));
+}
+
+function getRoleOfPlayer(room, playerId) {
+  return room.roleById?.get(playerId) || 'civilian';
+}
+
+function reconcileRoleSettings(room) {
+  if (!room.enableMisterWhite) {
+    room.misterWhiteCountSetting = 0;
+  }
+
+  const maxMisterWhite = room.enableMisterWhite ? Math.max(0, room.order.length - 1) : 0;
+  room.misterWhiteCountSetting = sanitizeBoundedInt(
+    room.misterWhiteCountSetting,
+    0,
+    maxMisterWhite,
+    0
+  );
+
+  const maxUndercover = Math.max(0, room.order.length - room.misterWhiteCountSetting - 1);
+  room.undercoverCountSetting = sanitizeBoundedInt(
+    room.undercoverCountSetting,
+    0,
+    maxUndercover,
+    1
+  );
+
+  const maxMisterWhiteAfterUnder = room.enableMisterWhite
+    ? Math.max(0, room.order.length - room.undercoverCountSetting - 1)
+    : 0;
+  room.misterWhiteCountSetting = sanitizeBoundedInt(
+    room.misterWhiteCountSetting,
+    0,
+    maxMisterWhiteAfterUnder,
+    room.misterWhiteCountSetting
+  );
+}
+
+function buildTurnOrder(room) {
+  const aliveIds = getAliveIds(room);
+  if (aliveIds.length === 0) return [];
+
+  const startScan = room.baseStartIndex || 0;
+  const turnOrder = [];
+  for (let step = 0; step < room.order.length; step += 1) {
+    const index = (startScan + step) % room.order.length;
+    const playerId = room.order[index];
+    if (!room.eliminatedIds.has(playerId)) {
+      turnOrder.push(playerId);
+    }
+  }
+  return turnOrder;
+}
+
+function startClueRound(room, incrementRound = true) {
+  room.turnOrder = buildTurnOrder(room);
+  room.currentTurnIndex = 0;
+  room.turnsPlayedInRound = 0;
+  room.votes = new Map();
+  room.phase = 'clues';
+  room.turnStartedAt = Date.now();
+  if (incrementRound) {
+    room.round += 1;
+  }
+}
+
+function findWinnerTeam(room) {
+  const aliveIds = getAliveIds(room);
+  const aliveEvilCount = aliveIds.filter((id) => {
+    const role = getRoleOfPlayer(room, id);
+    return role === 'undercover' || role === 'misterwhite';
+  }).length;
+  const aliveCivilianCount = aliveIds.length - aliveEvilCount;
+
+  if (aliveEvilCount === 0) {
+    return 'civilians';
+  }
+
+  if (aliveEvilCount >= aliveCivilianCount) {
+    return 'undercovers';
+  }
+
+  return null;
 }
 
 function clearTurnTimer(roomCode) {
@@ -290,6 +402,7 @@ function scheduleTurnTimer(room) {
 }
 
 function toPublicState(room, requesterId) {
+  reconcileRoleSettings(room);
   const players = room.order.map((id) => {
     const p = room.players.get(id);
     return {
@@ -297,7 +410,8 @@ function toPublicState(room, requesterId) {
       name: p.name,
       isHost: room.hostId === id,
       avatarUrl: p.avatar?.url || getRandomDefaultAvatar(),
-      score: room.scores.get(id) || 0
+      score: room.scores.get(id) || 0,
+      isAlive: !room.eliminatedIds?.has(id)
     };
   });
 
@@ -311,7 +425,13 @@ function toPublicState(room, requesterId) {
 
   const isHost = requesterId === room.hostId;
   const canStart = room.phase === 'lobby' && isHost && room.order.length >= 3;
-  const canSubmitClue = room.phase === 'clues' && getCurrentSpeakerId(room) === requesterId;
+  const requesterAlive = !room.eliminatedIds?.has(requesterId);
+  const canSubmitClue =
+    requesterAlive && room.phase === 'clues' && getCurrentSpeakerId(room) === requesterId;
+  const canSubmitMisterWhiteGuess =
+    room.phase === 'misterwhite_guess'
+    && room.pendingMisterWhiteGuess
+    && room.pendingMisterWhiteGuess.playerId === requesterId;
   const requester = room.players.get(requesterId);
   const selfLoverId =
     room.loversPair && room.loversPair.includes(requesterId)
@@ -323,12 +443,11 @@ function toPublicState(room, requesterId) {
     roomCode: room.code,
     phase: room.phase,
     round: room.round,
-    maxRounds: room.wordRounds || DEFAULT_WORD_ROUNDS,
     totalManches: room.totalManches || DEFAULT_MANCHES,
     currentManche: room.currentManche || 1,
     sessionFinished:
       (room.currentManche || 1) >= (room.totalManches || DEFAULT_MANCHES) && room.phase === 'ended',
-    wordRounds: room.wordRounds || DEFAULT_WORD_ROUNDS,
+    aliveCount: getAliveIds(room).length,
     players,
     clues,
     currentSpeakerId: room.phase === 'clues' ? getCurrentSpeakerId(room) : null,
@@ -337,16 +456,33 @@ function toPublicState(room, requesterId) {
         ? room.turnStartedAt + CLUE_TURN_DURATION_MS
         : null,
     votesCount: room.votes.size,
-    requiredVotes: room.order.length,
+    requiredVotes: getAliveIds(room).length,
     canStart,
     canSubmitClue,
+    canSubmitMisterWhiteGuess,
     isHost,
     enableMisterWhite: Boolean(room.enableMisterWhite),
     enableLovers: Boolean(room.enableLovers),
-    selfIsMisterWhite: room.misterWhiteId === requesterId,
+    undercoverCountSetting: room.undercoverCountSetting ?? 1,
+    misterWhiteCountSetting: room.misterWhiteCountSetting ?? 0,
+    civilianCountSetting: Math.max(
+      0,
+      room.order.length - (room.undercoverCountSetting ?? 0) - (room.misterWhiteCountSetting ?? 0)
+    ),
+    selfIsMisterWhite: Array.isArray(room.misterWhiteIds)
+      ? room.misterWhiteIds.includes(requesterId)
+      : room.misterWhiteId === requesterId,
     selfLoverName,
+    selfIsAlive: requesterAlive,
     selfId: requesterId,
-    hasVoted: room.votes.has(requesterId),
+    hasVoted: requesterAlive ? room.votes.has(requesterId) : false,
+    pendingMisterWhiteGuess: room.pendingMisterWhiteGuess
+      ? {
+          playerId: room.pendingMisterWhiteGuess.playerId,
+          playerName: room.players.get(room.pendingMisterWhiteGuess.playerId)?.name || 'Unknown'
+        }
+      : null,
+    lastMisterWhiteGuess: room.lastMisterWhiteGuess || null,
     selfAvatarExpiresAt: requester?.avatar?.type === 'upload' ? requester.avatar.expiresAt : null,
     canNextManche:
       room.phase === 'ended' &&
@@ -368,22 +504,31 @@ function emitRoomState(room) {
 }
 
 function startGame(room) {
+  reconcileRoleSettings(room);
   const pair = pickWordPairForRoom(room);
   if (!pair) return false;
-  const startingIndex = room.nextStartingIndex % room.order.length;
   const assignableIds = [...room.order];
-  const distribution = getRoleDistribution(assignableIds.length, Boolean(room.enableMisterWhite));
-  const misterWhiteId =
-    distribution.misterWhiteCount > 0 && assignableIds.length > 0 ? pickRandom(assignableIds) : null;
-  const undercoverPool = assignableIds.filter((id) => id !== misterWhiteId);
-  const undercoverIds = pickRandomDistinct(undercoverPool, distribution.undercoverCount);
+  const requestedUndercoverCount = Math.max(0, Number(room.undercoverCountSetting || 0));
+  const requestedMisterWhiteCount = room.enableMisterWhite
+    ? Math.max(0, Number(room.misterWhiteCountSetting || 0))
+    : 0;
 
-  // Safety lock: role counts must strictly match configured distribution.
-  if (undercoverIds.length !== distribution.undercoverCount) {
+  // Need at least one civilian in game.
+  if (requestedUndercoverCount + requestedMisterWhiteCount >= assignableIds.length) {
     return false;
   }
 
-  const loverPool = assignableIds.filter((id) => id !== misterWhiteId);
+  const misterWhiteIds = pickRandomDistinct(assignableIds, requestedMisterWhiteCount);
+  const undercoverPool = assignableIds.filter((id) => !misterWhiteIds.includes(id));
+  const undercoverIds = pickRandomDistinct(undercoverPool, requestedUndercoverCount);
+  if (
+    undercoverIds.length !== requestedUndercoverCount
+    || misterWhiteIds.length !== requestedMisterWhiteCount
+  ) {
+    return false;
+  }
+
+  const loverPool = assignableIds.filter((id) => !misterWhiteIds.includes(id));
   let loversPair = null;
   if (room.enableLovers && loverPool.length >= 2) {
     const firstLover = pickRandom(loverPool);
@@ -393,62 +538,69 @@ function startGame(room) {
   }
 
   room.phase = 'clues';
-  room.round = 1;
-  room.roundStartIndex = startingIndex;
-  room.currentTurnIndex = startingIndex;
-  room.turnsPlayedInRound = 0;
-  room.nextStartingIndex = (startingIndex + 1) % room.order.length;
+  room.round = 0;
+  room.baseStartIndex = room.nextStartingIndex % room.order.length;
+  room.nextStartingIndex = (room.baseStartIndex + 1) % room.order.length;
   room.clues = [];
   room.votes = new Map();
   room.result = null;
-  room.turnStartedAt = Date.now();
+  room.turnStartedAt = null;
+  room.pendingMisterWhiteGuess = null;
+  room.lastMisterWhiteGuess = null;
+  room.eliminatedIds = new Set();
+  room.roleById = new Map();
   room.secret = {
     civilianWord: pair.civilian,
     undercoverWord: pair.undercover,
     undercoverId: undercoverIds[0] || null,
     undercoverIds
   };
-  room.misterWhiteId = misterWhiteId;
+  room.misterWhiteId = misterWhiteIds[0] || null;
+  room.misterWhiteIds = misterWhiteIds;
   room.loversPair = loversPair;
 
   for (const playerId of room.order) {
     const isUndercover = undercoverIds.includes(playerId);
-    const word = playerId === misterWhiteId ? null : isUndercover ? pair.undercover : pair.civilian;
+    const isMisterWhite = misterWhiteIds.includes(playerId);
+    room.roleById.set(playerId, isMisterWhite ? 'misterwhite' : isUndercover ? 'undercover' : 'civilian');
+    const word = isMisterWhite ? null : isUndercover ? pair.undercover : pair.civilian;
     io.to(playerId).emit('game:role', {
       word,
-      maxRounds: room.wordRounds
+      maxRounds: 1
     });
   }
 
+  startClueRound(room, true);
   scheduleTurnTimer(room);
   emitRoomState(room);
   return true;
 }
 
-function applyRoundPoints(room, undercoverCaught) {
+function applyRoundPoints(room, eliminatedId, winnerTeam) {
   const undercoverIds = Array.isArray(room.secret?.undercoverIds)
     ? room.secret.undercoverIds
     : room.secret?.undercoverId
       ? [room.secret.undercoverId]
       : [];
   const undercoverSet = new Set(undercoverIds);
-  const civilianVotesForUndercover = room.order.filter((playerId) => {
+  const civilianVotesForEliminatedUndercover = room.order.filter((playerId) => {
     if (undercoverSet.has(playerId)) return false;
     const votedId = room.votes.get(playerId);
-    return Boolean(votedId && undercoverSet.has(votedId));
+    return Boolean(votedId && votedId === eliminatedId && undercoverSet.has(votedId));
   });
   const awards = [];
 
-  if (undercoverCaught && civilianVotesForUndercover.length > 0) {
-    for (const playerId of civilianVotesForUndercover) {
+  if (eliminatedId && undercoverSet.has(eliminatedId) && civilianVotesForEliminatedUndercover.length > 0) {
+    for (const playerId of civilianVotesForEliminatedUndercover) {
       awards.push({
         playerId,
         points: 100,
         reason: 'Undercover demasque et vote'
       });
     }
-  } else if (undercoverIds.length > 0) {
-    for (const undercoverId of undercoverIds) {
+  } else if (winnerTeam === 'undercovers' && undercoverIds.length > 0) {
+    const aliveUndercoverIds = undercoverIds.filter((id) => !room.eliminatedIds.has(id));
+    for (const undercoverId of aliveUndercoverIds) {
       awards.push({
         playerId: undercoverId,
         points: 150,
@@ -469,43 +621,19 @@ function applyRoundPoints(room, undercoverCaught) {
   }));
 }
 
-function concludeGame(room) {
+function concludeGame(room, winnerTeam, eliminatedId, suspectedIds, extraAwards = []) {
   clearTurnTimer(room.code);
-  const tally = new Map();
-  for (const targetId of room.votes.values()) {
-    tally.set(targetId, (tally.get(targetId) || 0) + 1);
-  }
-
-  const topSuspectedIds = [];
-  let best = -1;
-  for (const [playerId, count] of tally.entries()) {
-    if (count > best) {
-      best = count;
-      topSuspectedIds.length = 0;
-      topSuspectedIds.push(playerId);
-    } else if (count === best) {
-      topSuspectedIds.push(playerId);
-    }
-  }
-  const suspectedId = topSuspectedIds[0] || null;
-
   const undercoverIds = Array.isArray(room.secret?.undercoverIds)
     ? room.secret.undercoverIds
     : room.secret?.undercoverId
       ? [room.secret.undercoverId]
       : [];
   const undercoverId = undercoverIds[0] || null;
-  const undercoverSet = new Set(undercoverIds);
-  const undercoverCaught = room.order.some((playerId) => {
-    if (undercoverSet.has(playerId)) return false;
-    const votedId = room.votes.get(playerId);
-    return Boolean(votedId && undercoverSet.has(votedId));
-  });
-  const pointsAwarded = applyRoundPoints(room, undercoverCaught);
+  const pointsAwarded = [...applyRoundPoints(room, eliminatedId, winnerTeam), ...extraAwards];
   const undercoverNames = undercoverIds
     .map((id) => room.players.get(id)?.name || 'Unknown')
     .join(', ');
-  const suspectedName = topSuspectedIds
+  const suspectedName = (suspectedIds || [])
     .map((id) => room.players.get(id)?.name || 'Unknown')
     .join(', ');
 
@@ -514,9 +642,10 @@ function concludeGame(room) {
     undercoverId,
     undercoverName: undercoverNames || 'Aucun',
     undercoverIds,
-    suspectedId,
+    suspectedId: eliminatedId || null,
     suspectedName: suspectedName || null,
-    undercoverCaught,
+    undercoverCaught: winnerTeam === 'civilians',
+    winnerTeam,
     civilianWord: room.secret.civilianWord,
     undercoverWord: room.secret.undercoverWord,
     pointsAwarded,
@@ -546,17 +675,8 @@ function advanceTurn(room) {
 
   room.round += 1;
   room.turnsPlayedInRound = 0;
-
-  if (room.round > room.wordRounds) {
-    room.phase = 'voting';
-    room.currentTurnIndex = 0;
-    room.turnsPlayedInRound = 0;
-    return;
-  }
-
-  // Keep the same speaking order for every clue round in a manche.
-  // The first speaker rotates only when a new manche starts (new word pair).
-  room.currentTurnIndex = room.roundStartIndex;
+  room.phase = 'voting';
+  room.currentTurnIndex = 0;
 }
 
 function abortGameIfTooFewPlayers(room) {
@@ -598,6 +718,9 @@ function leaveRoom(socketId) {
   const removedIndex = room.order.indexOf(socketId);
   room.players.delete(socketId);
   room.order = room.order.filter((id) => id !== socketId);
+  room.turnOrder = (room.turnOrder || []).filter((id) => id !== socketId);
+  room.eliminatedIds.delete(socketId);
+  room.roleById.delete(socketId);
   room.scores.delete(socketId);
   room.votes.delete(socketId);
 
@@ -618,16 +741,10 @@ function leaveRoom(socketId) {
   }
 
   if (removedIndex !== -1) {
-    if (room.currentTurnIndex > removedIndex) {
-      room.currentTurnIndex -= 1;
-    } else if (room.currentTurnIndex >= room.order.length) {
-      room.currentTurnIndex = 0;
-    }
-
-    if (room.roundStartIndex > removedIndex) {
-      room.roundStartIndex -= 1;
-    } else if (room.roundStartIndex >= room.order.length) {
-      room.roundStartIndex = 0;
+    if (room.baseStartIndex > removedIndex) {
+      room.baseStartIndex -= 1;
+    } else if (room.baseStartIndex >= room.order.length) {
+      room.baseStartIndex = 0;
     }
   }
 
@@ -635,8 +752,13 @@ function leaveRoom(socketId) {
     0,
     Math.min(room.turnsPlayedInRound || 0, room.order.length)
   );
+  reconcileRoleSettings(room);
 
   if (room.phase === 'clues') {
+    room.turnOrder = buildTurnOrder(room);
+    if (room.currentTurnIndex >= room.turnOrder.length) {
+      room.currentTurnIndex = 0;
+    }
     room.turnStartedAt = Date.now();
     scheduleTurnTimer(room);
   } else {
@@ -830,23 +952,31 @@ io.on('connection', (socket) => {
       votes: new Map(),
       secret: null,
       result: null,
-      roundStartIndex: 0,
+      baseStartIndex: 0,
       nextStartingIndex: 0,
+      turnOrder: [],
+      eliminatedIds: new Set(),
+      roleById: new Map(),
+      pendingMisterWhiteGuess: null,
+      lastMisterWhiteGuess: null,
       usedWordPairIndexes: new Set(),
       totalManches,
       currentManche: 1,
-      wordRounds: DEFAULT_WORD_ROUNDS,
       turnStartedAt: null,
       turnsPlayedInRound: 0,
       enableMisterWhite: false,
+      undercoverCountSetting: 1,
+      misterWhiteCountSetting: 0,
       enableLovers: false,
       misterWhiteId: null,
+      misterWhiteIds: [],
       loversPair: null
     };
 
     room.players.set(socket.id, createPlayer(socket.id, name, selectedDefaultAvatar));
     room.scores.set(socket.id, 0);
     room.order.push(socket.id);
+    reconcileRoleSettings(room);
 
     rooms.set(code, room);
     playerRoom.set(socket.id, code);
@@ -887,6 +1017,7 @@ io.on('connection', (socket) => {
     room.players.set(socket.id, createPlayer(socket.id, name, selectedDefaultAvatar));
     room.scores.set(socket.id, 0);
     room.order.push(socket.id);
+    reconcileRoleSettings(room);
     playerRoom.set(socket.id, roomCode);
     socket.join(roomCode);
 
@@ -919,36 +1050,11 @@ io.on('connection', (socket) => {
     }
 
     room.usedWordPairIndexes = new Set();
-    startGame(room);
-    callback({ ok: true });
-  });
-
-  socket.on('room:updateWordRounds', (payload, callback = () => {}) => {
-    const roomCode = playerRoom.get(socket.id);
-    const room = rooms.get(roomCode);
-
-    if (!room) {
-      callback({ ok: false, error: 'Room not found.' });
+    const started = startGame(room);
+    if (!started) {
+      callback({ ok: false, error: 'Reglages de roles invalides pour ce nombre de joueurs.' });
       return;
     }
-
-    if (room.hostId !== socket.id) {
-      callback({ ok: false, error: 'Only host can update rounds.' });
-      return;
-    }
-
-    if (room.phase !== 'lobby') {
-      callback({ ok: false, error: 'Rounds can only be changed in lobby.' });
-      return;
-    }
-
-    room.wordRounds = sanitizeBoundedInt(
-      payload?.wordRounds,
-      MIN_WORD_ROUNDS,
-      MAX_WORD_ROUNDS,
-      DEFAULT_WORD_ROUNDS
-    );
-    emitRoomState(room);
     callback({ ok: true });
   });
 
@@ -976,6 +1082,40 @@ io.on('connection', (socket) => {
     }
     if (typeof payload?.enableLovers === 'boolean') {
       room.enableLovers = payload.enableLovers;
+    }
+    reconcileRoleSettings(room);
+
+    if (typeof payload?.misterWhiteCount === 'number') {
+      room.misterWhiteCountSetting = sanitizeBoundedInt(
+        payload.misterWhiteCount,
+        0,
+        room.enableMisterWhite ? Math.max(0, room.order.length - 1) : 0,
+        room.misterWhiteCountSetting
+      );
+      reconcileRoleSettings(room);
+    }
+
+    if (typeof payload?.undercoverCount === 'number') {
+      room.undercoverCountSetting = sanitizeBoundedInt(
+        payload.undercoverCount,
+        0,
+        Math.max(0, room.order.length - room.misterWhiteCountSetting - 1),
+        room.undercoverCountSetting
+      );
+      reconcileRoleSettings(room);
+    }
+
+    if (typeof payload?.civilianCount === 'number') {
+      const maxCivilian = room.order.length;
+      const requestedCivilian = sanitizeBoundedInt(payload.civilianCount, 0, maxCivilian, 1);
+      const derivedUndercover = room.order.length - room.misterWhiteCountSetting - requestedCivilian;
+      room.undercoverCountSetting = sanitizeBoundedInt(
+        derivedUndercover,
+        0,
+        Math.max(0, room.order.length - room.misterWhiteCountSetting - 1),
+        room.undercoverCountSetting
+      );
+      reconcileRoleSettings(room);
     }
 
     emitRoomState(room);
@@ -1072,6 +1212,11 @@ io.on('connection', (socket) => {
       return;
     }
 
+    if (room.eliminatedIds.has(socket.id)) {
+      callback({ ok: false, error: 'Eliminated players cannot submit clues.' });
+      return;
+    }
+
     if (getCurrentSpeakerId(room) !== socket.id) {
       callback({ ok: false, error: 'Not your turn.' });
       return;
@@ -1115,8 +1260,13 @@ io.on('connection', (socket) => {
       return;
     }
 
+    if (room.eliminatedIds.has(socket.id)) {
+      callback({ ok: false, error: 'Eliminated players cannot vote.' });
+      return;
+    }
+
     const targetId = payload?.targetId;
-    if (!room.players.has(targetId)) {
+    if (!room.players.has(targetId) || room.eliminatedIds.has(targetId)) {
       callback({ ok: false, error: 'Invalid target.' });
       return;
     }
@@ -1128,8 +1278,49 @@ io.on('connection', (socket) => {
 
     room.votes.set(socket.id, targetId);
 
-    if (room.votes.size === room.order.length) {
-      concludeGame(room);
+    const aliveIds = getAliveIds(room);
+    if (room.votes.size === aliveIds.length) {
+      const tally = new Map();
+      for (const votedId of room.votes.values()) {
+        tally.set(votedId, (tally.get(votedId) || 0) + 1);
+      }
+
+      const topSuspectedIds = [];
+      let best = -1;
+      for (const [playerId, count] of tally.entries()) {
+        if (count > best) {
+          best = count;
+          topSuspectedIds.length = 0;
+          topSuspectedIds.push(playerId);
+        } else if (count === best) {
+          topSuspectedIds.push(playerId);
+        }
+      }
+
+      const eliminatedId = topSuspectedIds[0] || null;
+      if (eliminatedId) {
+        room.eliminatedIds.add(eliminatedId);
+      }
+
+      const eliminatedRole = eliminatedId ? getRoleOfPlayer(room, eliminatedId) : null;
+      if (eliminatedId && eliminatedRole === 'misterwhite') {
+        room.phase = 'misterwhite_guess';
+        room.pendingMisterWhiteGuess = { playerId: eliminatedId };
+        room.lastMisterWhiteGuess = null;
+        room.turnStartedAt = null;
+        emitRoomState(room);
+        callback({ ok: true });
+        return;
+      }
+
+      const winnerTeam = findWinnerTeam(room);
+      if (winnerTeam) {
+        concludeGame(room, winnerTeam, eliminatedId, topSuspectedIds);
+      } else {
+        startClueRound(room, true);
+        scheduleTurnTimer(room);
+        emitRoomState(room);
+      }
     } else {
       emitRoomState(room);
     }
@@ -1161,7 +1352,74 @@ io.on('connection', (socket) => {
     room.currentTurnIndex = 0;
     room.turnStartedAt = null;
     room.turnsPlayedInRound = 0;
+    room.votes = new Map();
     emitRoomState(room);
+    callback({ ok: true });
+  });
+
+  socket.on('game:misterWhiteGuess', (payload, callback = () => {}) => {
+    const roomCode = playerRoom.get(socket.id);
+    const room = rooms.get(roomCode);
+
+    if (!room) {
+      callback({ ok: false, error: 'Room not found.' });
+      return;
+    }
+
+    if (room.phase !== 'misterwhite_guess') {
+      callback({ ok: false, error: 'Not mister white guess phase.' });
+      return;
+    }
+
+    if (!room.pendingMisterWhiteGuess || room.pendingMisterWhiteGuess.playerId !== socket.id) {
+      callback({ ok: false, error: 'Only eliminated mister white can guess.' });
+      return;
+    }
+
+    const guess = sanitizeGuessWord(payload?.word);
+    if (!guess) {
+      callback({ ok: false, error: 'Invalid word guess.' });
+      return;
+    }
+
+    const targetWord = room.secret?.civilianWord || '';
+    const correct = isGuessCloseEnough(guess, targetWord);
+    const bonusAwards = [];
+    if (correct) {
+      const previous = room.scores.get(socket.id) || 0;
+      room.scores.set(socket.id, previous + 300);
+      bonusAwards.push({
+        playerId: socket.id,
+        playerName: room.players.get(socket.id)?.name || 'Unknown',
+        points: 300,
+        reason: 'Mister White trouve le mot',
+        totalScore: room.scores.get(socket.id) || 0
+      });
+    }
+
+    room.lastMisterWhiteGuess = {
+      playerId: socket.id,
+      guess,
+      correct,
+      targetWord
+    };
+    room.pendingMisterWhiteGuess = null;
+
+    if (correct) {
+      concludeGame(room, 'undercovers', socket.id, [socket.id], bonusAwards);
+      callback({ ok: true });
+      return;
+    }
+
+    const winnerTeam = findWinnerTeam(room);
+    if (winnerTeam) {
+      concludeGame(room, winnerTeam, socket.id, [socket.id], bonusAwards);
+    } else {
+      startClueRound(room, true);
+      scheduleTurnTimer(room);
+      emitRoomState(room);
+    }
+
     callback({ ok: true });
   });
 
@@ -1190,7 +1448,11 @@ io.on('connection', (socket) => {
     }
 
     room.currentManche += 1;
-    startGame(room);
+    const started = startGame(room);
+    if (!started) {
+      callback({ ok: false, error: 'Reglages de roles invalides pour ce nombre de joueurs.' });
+      return;
+    }
     callback({ ok: true });
   });
 
@@ -1218,8 +1480,14 @@ io.on('connection', (socket) => {
     room.usedWordPairIndexes = new Set();
     room.turnStartedAt = null;
     room.turnsPlayedInRound = 0;
+    room.turnOrder = [];
+    room.eliminatedIds = new Set();
+    room.roleById = new Map();
+    room.pendingMisterWhiteGuess = null;
+    room.lastMisterWhiteGuess = null;
     room.currentManche = room.currentManche >= room.totalManches ? 1 : room.currentManche + 1;
     room.misterWhiteId = null;
+    room.misterWhiteIds = [];
     room.loversPair = null;
     clearTurnTimer(room.code);
 
