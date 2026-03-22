@@ -642,7 +642,13 @@ function scheduleVoteResolution(room) {
 
 function toPublicState(room, requesterId) {
   reconcileRoleSettings(room);
-  const players = room.order.map((id) => {
+  const playersOrder =
+    room.phase === 'lobby'
+      ? room.order
+      : Array.isArray(room.turnBaseOrder) && room.turnBaseOrder.length > 0
+        ? room.turnBaseOrder
+        : room.order;
+  const players = playersOrder.map((id) => {
     const p = room.players.get(id);
     return {
       id: p.id,

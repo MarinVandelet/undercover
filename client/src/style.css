@@ -505,20 +505,37 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+  align-items: stretch;
 }
 
-.vote-confirmed-btn {
+.vote-state-btn {
   border-radius: 12px;
+  min-height: 54px;
+  height: 54px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 16px !important;
+  margin-top: 0 !important;
+  line-height: 1;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vote-state-btn:not(.primary) {
   border: 1px solid rgba(92, 126, 179, 0.7);
   background: rgba(30, 51, 87, 0.6);
   color: #d7e6ff;
-  min-height: 54px;
-  font-weight: 700;
   cursor: default;
 }
 
 .vote-change-btn {
-  min-height: 54px;
+  height: 54px;
+}
+
+.vote-actions-split .primary {
+  margin-top: 0;
 }
 
 .round-result-panel h3 {
