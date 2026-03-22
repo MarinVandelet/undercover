@@ -326,6 +326,29 @@ function buildTurnOrder(room) {
   return turnOrder;
 }
 
+function eliminatePlayerWithLover(room, playerId) {
+  if (!playerId || room.eliminatedIds.has(playerId)) return [];
+  const eliminated = [playerId];
+  room.eliminatedIds.add(playerId);
+
+  if (room.loversPair && room.loversPair.includes(playerId)) {
+    const partnerId = room.loversPair.find((id) => id !== playerId);
+    if (partnerId && !room.eliminatedIds.has(partnerId)) {
+      room.eliminatedIds.add(partnerId);
+      eliminated.push(partnerId);
+    }
+  }
+
+  return eliminated;
+}
+
+function areOnlyLoversAlive(room) {
+  if (!room.loversPair || room.loversPair.length !== 2) return false;
+  const aliveIds = getAliveIds(room);
+  if (aliveIds.length !== 2) return false;
+  return room.loversPair.every((id) => aliveIds.includes(id));
+}
+
 function startClueRound(room, incrementRound = true) {
   room.turnOrder = buildTurnOrder(room);
   room.currentTurnIndex = 0;
@@ -630,6 +653,19 @@ function concludeGame(room, winnerTeam, eliminatedId, suspectedIds, extraAwards 
       : [];
   const undercoverId = undercoverIds[0] || null;
   const pointsAwarded = [...applyRoundPoints(room, eliminatedId, winnerTeam), ...extraAwards];
+  if (areOnlyLoversAlive(room)) {
+    for (const loverId of room.loversPair) {
+      const previous = room.scores.get(loverId) || 0;
+      room.scores.set(loverId, previous + 100);
+      pointsAwarded.push({
+        playerId: loverId,
+        playerName: room.players.get(loverId)?.name || 'Unknown',
+        points: 100,
+        reason: 'Bonus amoureux survivants',
+        totalScore: room.scores.get(loverId) || 0
+      });
+    }
+  }
   const undercoverNames = undercoverIds
     .map((id) => room.players.get(id)?.name || 'Unknown')
     .join(', ');
@@ -1298,9 +1334,7 @@ io.on('connection', (socket) => {
       }
 
       const eliminatedId = topSuspectedIds[0] || null;
-      if (eliminatedId) {
-        room.eliminatedIds.add(eliminatedId);
-      }
+      const eliminatedIds = eliminatedId ? eliminatePlayerWithLover(room, eliminatedId) : [];
 
       const eliminatedRole = eliminatedId ? getRoleOfPlayer(room, eliminatedId) : null;
       if (eliminatedId && eliminatedRole === 'misterwhite') {
@@ -1315,7 +1349,7 @@ io.on('connection', (socket) => {
 
       const winnerTeam = findWinnerTeam(room);
       if (winnerTeam) {
-        concludeGame(room, winnerTeam, eliminatedId, topSuspectedIds);
+        concludeGame(room, winnerTeam, eliminatedId, eliminatedIds.length ? eliminatedIds : topSuspectedIds);
       } else {
         startClueRound(room, true);
         scheduleTurnTimer(room);
