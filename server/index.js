@@ -119,6 +119,15 @@ function pickRandomDistinct(array, count) {
   return picks;
 }
 
+function shuffleArray(array) {
+  const copy = [...array];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 function pickWordPairForRoom(room) {
   if (!room.usedWordPairIndexes) {
     room.usedWordPairIndexes = new Set();
@@ -322,14 +331,17 @@ function reconcileRoleSettings(room) {
 }
 
 function buildTurnOrder(room) {
-  const aliveIds = getAliveIds(room);
+  const sourceOrder = Array.isArray(room.turnBaseOrder) && room.turnBaseOrder.length > 0
+    ? room.turnBaseOrder
+    : room.order;
+  const aliveIds = sourceOrder.filter((id) => !room.eliminatedIds?.has(id));
   if (aliveIds.length === 0) return [];
 
-  const startScan = room.baseStartIndex || 0;
+  const startScan = sourceOrder.length > 0 ? (room.baseStartIndex || 0) % sourceOrder.length : 0;
   const turnOrder = [];
-  for (let step = 0; step < room.order.length; step += 1) {
-    const index = (startScan + step) % room.order.length;
-    const playerId = room.order[index];
+  for (let step = 0; step < sourceOrder.length; step += 1) {
+    const index = (startScan + step) % sourceOrder.length;
+    const playerId = sourceOrder[index];
     if (!room.eliminatedIds.has(playerId)) {
       turnOrder.push(playerId);
     }
@@ -361,6 +373,12 @@ function areOnlyLoversAlive(room) {
 }
 
 function startClueRound(room, incrementRound = true) {
+  const sourceOrder = Array.isArray(room.turnBaseOrder) && room.turnBaseOrder.length > 0
+    ? room.turnBaseOrder
+    : room.order;
+  if (incrementRound && room.round > 0 && sourceOrder.length > 0) {
+    room.baseStartIndex = (room.baseStartIndex + 1) % sourceOrder.length;
+  }
   room.turnOrder = buildTurnOrder(room);
   room.currentTurnIndex = 0;
   room.turnsPlayedInRound = 0;
@@ -433,6 +451,7 @@ function remapPlayerId(room, fromId, toId) {
   player.id = toId;
   room.players.set(toId, player);
   room.order = replaceIdInArray(room.order, fromId, toId);
+  room.turnBaseOrder = replaceIdInArray(room.turnBaseOrder || [], fromId, toId);
   room.turnOrder = replaceIdInArray(room.turnOrder, fromId, toId);
 
   if (room.hostId === fromId) room.hostId = toId;
@@ -739,9 +758,9 @@ function startGame(room) {
   reconcileRoleSettings(room);
   const pair = pickWordPairForRoom(room);
   if (!pair) return false;
-  const startIndex = room.nextStartingIndex % room.order.length;
-  const firstSpeakerId = room.order[startIndex];
-  const assignableIds = [...room.order];
+  const turnBaseOrder = shuffleArray(room.order);
+  const firstSpeakerId = turnBaseOrder[0] || null;
+  const assignableIds = [...turnBaseOrder];
   const requestedUndercoverCount = Math.max(0, Number(room.undercoverCountSetting || 0));
   const requestedMisterWhiteCount = room.enableMisterWhite
     ? Math.max(0, Number(room.misterWhiteCountSetting || 0))
@@ -777,8 +796,9 @@ function startGame(room) {
 
   room.phase = 'clues';
   room.round = 0;
-  room.baseStartIndex = startIndex;
-  room.nextStartingIndex = (room.baseStartIndex + 1) % room.order.length;
+  room.turnBaseOrder = turnBaseOrder;
+  room.baseStartIndex = 0;
+  room.nextStartingIndex = 0;
   room.clues = [];
   room.votes = new Map();
   room.result = null;
@@ -1085,8 +1105,10 @@ function leaveRoom(socketId) {
   removePlayerUpload(leavingPlayer);
 
   const removedIndex = room.order.indexOf(socketId);
+  const removedTurnBaseIndex = (room.turnBaseOrder || []).indexOf(socketId);
   room.players.delete(socketId);
   room.order = room.order.filter((id) => id !== socketId);
+  room.turnBaseOrder = (room.turnBaseOrder || []).filter((id) => id !== socketId);
   room.turnOrder = (room.turnOrder || []).filter((id) => id !== socketId);
   room.eliminatedIds.delete(socketId);
   room.roleById.delete(socketId);
@@ -1110,12 +1132,14 @@ function leaveRoom(socketId) {
     return;
   }
 
-  if (removedIndex !== -1) {
-    if (room.baseStartIndex > removedIndex) {
+  if (removedTurnBaseIndex !== -1) {
+    if (room.baseStartIndex > removedTurnBaseIndex) {
       room.baseStartIndex -= 1;
-    } else if (room.baseStartIndex >= room.order.length) {
+    } else if (room.baseStartIndex >= (room.turnBaseOrder?.length || 0)) {
       room.baseStartIndex = 0;
     }
+  } else if (removedIndex !== -1 && room.baseStartIndex >= (room.turnBaseOrder?.length || room.order.length)) {
+    room.baseStartIndex = 0;
   }
 
   room.turnsPlayedInRound = Math.max(
@@ -1343,6 +1367,7 @@ io.on('connection', (socket) => {
       result: null,
       baseStartIndex: 0,
       nextStartingIndex: 0,
+      turnBaseOrder: [],
       turnOrder: [],
       eliminatedIds: new Set(),
       roleById: new Map(),
@@ -1883,6 +1908,7 @@ io.on('connection', (socket) => {
     room.usedWordPairIndexes = new Set();
     room.turnStartedAt = null;
     room.turnsPlayedInRound = 0;
+    room.turnBaseOrder = [];
     room.turnOrder = [];
     room.eliminatedIds = new Set();
     room.roleById = new Map();
