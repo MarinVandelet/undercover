@@ -530,6 +530,8 @@ function startGame(room) {
   reconcileRoleSettings(room);
   const pair = pickWordPairForRoom(room);
   if (!pair) return false;
+  const startIndex = room.nextStartingIndex % room.order.length;
+  const firstSpeakerId = room.order[startIndex];
   const assignableIds = [...room.order];
   const requestedUndercoverCount = Math.max(0, Number(room.undercoverCountSetting || 0));
   const requestedMisterWhiteCount = room.enableMisterWhite
@@ -541,7 +543,11 @@ function startGame(room) {
     return false;
   }
 
-  const misterWhiteIds = pickRandomDistinct(assignableIds, requestedMisterWhiteCount);
+  const misterWhitePool = assignableIds.filter((id) => id !== firstSpeakerId);
+  if (requestedMisterWhiteCount > misterWhitePool.length) {
+    return false;
+  }
+  const misterWhiteIds = pickRandomDistinct(misterWhitePool, requestedMisterWhiteCount);
   const undercoverPool = assignableIds.filter((id) => !misterWhiteIds.includes(id));
   const undercoverIds = pickRandomDistinct(undercoverPool, requestedUndercoverCount);
   if (
@@ -562,7 +568,7 @@ function startGame(room) {
 
   room.phase = 'clues';
   room.round = 0;
-  room.baseStartIndex = room.nextStartingIndex % room.order.length;
+  room.baseStartIndex = startIndex;
   room.nextStartingIndex = (room.baseStartIndex + 1) % room.order.length;
   room.clues = [];
   room.votes = new Map();
