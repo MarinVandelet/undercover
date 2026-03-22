@@ -182,6 +182,12 @@ export function GameView({
         <div className="clue-input-card">
           {room.phase === 'clues' ? (
             <>
+              {room.lastMisterWhiteGuess && !room.lastMisterWhiteGuess.correct ? (
+                <p className="mister-white-feedback">
+                  Mister White ({room.players.find((p) => p.id === room.lastMisterWhiteGuess?.playerId)?.name || 'Inconnu'})
+                  {' '}n'a pas trouve le mot.
+                </p>
+              ) : null}
               <p>Indice precedent: {previousClue ? `${previousClue.playerName}: ${previousClue.text}` : 'Aucun'}</p>
               {room.canSubmitClue ? (
                 <form onSubmit={onSubmitClue} className="clue-dock-form">

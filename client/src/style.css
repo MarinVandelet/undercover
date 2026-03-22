@@ -454,6 +454,11 @@ body {
   color: var(--muted);
 }
 
+.mister-white-feedback {
+  color: #ffbf80 !important;
+  font-weight: 700;
+}
+
 .clue-dock-form {
   display: grid;
   grid-template-columns: 1fr 180px;
@@ -839,6 +844,7 @@ button:disabled {
 .settings-panel {
   margin-top: 8px;
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -879,6 +885,7 @@ button:disabled {
 }
 
 .apply-settings-btn {
+  grid-column: 1 / -1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -889,6 +896,7 @@ button:disabled {
 }
 
 .special-roles-grid {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
@@ -1088,6 +1096,10 @@ small {
   }
 
   .settings-row {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-panel {
     grid-template-columns: 1fr;
   }
 

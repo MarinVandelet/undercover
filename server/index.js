@@ -702,10 +702,18 @@ function concludeGame(room, winnerTeam, eliminatedId, suspectedIds, extraAwards 
 }
 
 function advanceTurn(room) {
+  const activeCount = room.turnOrder?.length || 0;
+  if (activeCount <= 0) {
+    room.phase = 'voting';
+    room.currentTurnIndex = 0;
+    room.turnsPlayedInRound = 0;
+    return;
+  }
+
   room.turnsPlayedInRound = (room.turnsPlayedInRound || 0) + 1;
 
-  if (room.turnsPlayedInRound < room.order.length) {
-    room.currentTurnIndex = (room.currentTurnIndex + 1) % room.order.length;
+  if (room.turnsPlayedInRound < activeCount) {
+    room.currentTurnIndex = (room.currentTurnIndex + 1) % activeCount;
     return;
   }
 
