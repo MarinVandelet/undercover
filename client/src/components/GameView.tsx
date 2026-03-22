@@ -32,6 +32,7 @@ type GameViewProps = {
   onToggleAudio: () => void;
   audioVolume: number;
   onChangeAudioVolume: (value: number) => void;
+  onQuitToHome: () => void;
 };
 
 export function GameView({
@@ -56,7 +57,8 @@ export function GameView({
   audioEnabled,
   onToggleAudio,
   audioVolume,
-  onChangeAudioVolume
+  onChangeAudioVolume,
+  onQuitToHome
 }: GameViewProps) {
   const [selectedVoteId, setSelectedVoteId] = useState('');
   const roundPoints = new Map<string, number>();
@@ -75,7 +77,7 @@ export function GameView({
 
   function submitVote(event: FormEvent) {
     event.preventDefault();
-    if (!selectedVoteId || room.hasVoted) return;
+    if (!selectedVoteId) return;
     onVote(selectedVoteId);
   }
 
@@ -90,7 +92,9 @@ export function GameView({
 
       <header className="clue-topbar">
         <div className="clue-top-left">
-          <img className="clue-header-logo" src={withBase('/logo_blanc.png')} alt="Undercover" />
+          <button className="logo-home-btn" type="button" onClick={onQuitToHome} title="Quitter la partie">
+            <img className="clue-header-logo" src={withBase('/logo_blanc.png')} alt="Undercover" />
+          </button>
         </div>
         <div className="clue-word-hero" aria-live="polite">
           {room.phase === 'ended' ? (

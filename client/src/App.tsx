@@ -37,6 +37,9 @@ const AUDIO_PREFS_KEY = 'undercover_audio_prefs_v1';
 const AUDIO_PREFS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PLAYER_NAME_KEY = 'undercover_player_name_v1';
 const PLAYER_NAME_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const SESSION_TOKEN_KEY = 'undercover_session_token_v2';
+const RESUME_HINT_KEY = 'undercover_resume_hint_v1';
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 function randomDefaultAvatar() {
   return DEFAULT_AVATARS[Math.floor(Math.random() * DEFAULT_AVATARS.length)];
@@ -122,6 +125,63 @@ function sanitizeName(name: string) {
   return name.trim().replace(/\s+/g, ' ').slice(0, 18);
 }
 
+function loadSessionToken() {
+  try {
+    const raw = window.localStorage.getItem(SESSION_TOKEN_KEY);
+    if (!raw) return '';
+    const parsed = JSON.parse(raw) as { value?: string; expiresAt?: number };
+    if (!parsed.expiresAt || Date.now() > parsed.expiresAt || !parsed.value) {
+      window.localStorage.removeItem(SESSION_TOKEN_KEY);
+      return '';
+    }
+    return String(parsed.value);
+  } catch (_error) {
+    return '';
+  }
+}
+
+function saveSessionToken(token: string) {
+  if (!token) return;
+  try {
+    window.localStorage.setItem(
+      SESSION_TOKEN_KEY,
+      JSON.stringify({ value: token, expiresAt: Date.now() + SESSION_TTL_MS })
+    );
+  } catch (_error) {
+    // no-op
+  }
+}
+
+function setResumeHint(active: boolean) {
+  try {
+    if (!active) {
+      window.localStorage.removeItem(RESUME_HINT_KEY);
+      return;
+    }
+    window.localStorage.setItem(
+      RESUME_HINT_KEY,
+      JSON.stringify({ value: true, expiresAt: Date.now() + SESSION_TTL_MS })
+    );
+  } catch (_error) {
+    // no-op
+  }
+}
+
+function hasResumeHint() {
+  try {
+    const raw = window.localStorage.getItem(RESUME_HINT_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { value?: boolean; expiresAt?: number };
+    if (!parsed.expiresAt || Date.now() > parsed.expiresAt || !parsed.value) {
+      window.localStorage.removeItem(RESUME_HINT_KEY);
+      return false;
+    }
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 
 export default function App() {
   const [playerName, setPlayerName] = useState(() => loadSavedPlayerName());
@@ -140,6 +200,7 @@ export default function App() {
   const [nowTick, setNowTick] = useState(Date.now());
   const [audioEnabled, setAudioEnabled] = useState(() => loadAudioPrefs().audioEnabled);
   const [audioVolume, setAudioVolume] = useState(() => loadAudioPrefs().audioVolume);
+  const [sessionToken, setSessionToken] = useState(() => loadSessionToken());
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
@@ -148,14 +209,15 @@ export default function App() {
   const selfId = room?.selfId || socket.id || '';
 
   useEffect(() => {
-    // Cleanup legacy key from the old auto-resume system.
-    window.localStorage.removeItem('undercover_session_token_v1');
-  }, []);
+    if (!sessionToken) return;
+    saveSessionToken(sessionToken);
+  }, [sessionToken]);
 
   useEffect(() => {
     function onRoomUpdate(next: RoomState) {
       setRoom(next);
       setLobbyMatchCount(next.totalManches);
+      setResumeHint(true);
       const me = next.players.find((p) => p.id === socket.id);
       if (me && DEFAULT_AVATARS.includes(me.avatarUrl)) {
         setSelectedDefaultAvatar(me.avatarUrl);
@@ -171,6 +233,7 @@ export default function App() {
       setRoom(null);
       setRoleInfo(null);
       setClueText('');
+      setResumeHint(false);
       setStatus('La room a ete supprimee.');
     }
 
@@ -184,6 +247,25 @@ export default function App() {
       socket.off('room:deleted', onRoomDeleted);
     };
   }, []);
+
+  useEffect(() => {
+    function tryResume() {
+      if (room || !sessionToken || !hasResumeHint()) return;
+      socket.emit('room:resume', { sessionToken }, (ack: Ack) => {
+        if (!ack?.ok) return;
+        if (ack.sessionToken) setSessionToken(ack.sessionToken);
+        setStatus('Session restauree.');
+      });
+    }
+
+    socket.on('connect', tryResume);
+    if (socket.connected) {
+      tryResume();
+    }
+    return () => {
+      socket.off('connect', tryResume);
+    };
+  }, [room, sessionToken]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowTick(Date.now()), 60);
@@ -398,13 +480,19 @@ export default function App() {
     const name = validateName();
     if (!name) return;
 
-    const ack = await emitAck('room:create', { name, avatarUrl: selectedDefaultAvatar });
+    const ack = await emitAck('room:create', {
+      name,
+      avatarUrl: selectedDefaultAvatar,
+      sessionToken
+    });
     if (!ack.ok) {
       setStatus(ack.error || 'Creation impossible.');
       return;
     }
 
     setRoleInfo(null);
+    if (ack.sessionToken) setSessionToken(ack.sessionToken);
+    setResumeHint(true);
     setStatus(`Room ${ack.roomCode} crée.`);
 
     if (pendingUploadFile) {
@@ -422,13 +510,20 @@ export default function App() {
       return;
     }
 
-    const ack = await emitAck('room:join', { name, roomCode, avatarUrl: selectedDefaultAvatar });
+    const ack = await emitAck('room:join', {
+      name,
+      roomCode,
+      avatarUrl: selectedDefaultAvatar,
+      sessionToken
+    });
     if (!ack.ok) {
       setStatus(ack.error || 'Impossible de rejoindre.');
       return;
     }
 
     setRoleInfo(null);
+    if (ack.sessionToken) setSessionToken(ack.sessionToken);
+    setResumeHint(true);
     setStatus(`Tu as rejoint ${roomCode}.`);
 
     if (pendingUploadFile) {
@@ -618,6 +713,7 @@ export default function App() {
 
   async function leaveCurrentRoom() {
     await emitAck('room:leave');
+    setResumeHint(false);
     setRoom(null);
     setRoleInfo(null);
     setClueText('');
@@ -630,6 +726,7 @@ export default function App() {
       setStatus(ack.error || 'Suppression room impossible.');
       return;
     }
+    setResumeHint(false);
     setRoom(null);
     setRoleInfo(null);
     setClueText('');
@@ -764,6 +861,7 @@ export default function App() {
         onToggleAudio={toggleAudio}
         audioVolume={audioVolume}
         onChangeAudioVolume={changeAudioVolume}
+        onQuitToHome={leaveCurrentRoom}
       />
     );
   }

@@ -17,6 +17,7 @@ const MIN_MANCHES = 1;
 const MAX_MANCHES = Math.max(1, Math.min(10, WORD_PAIRS.length));
 const AVATAR_TTL_MS = 3 * 60 * 60 * 1000;
 const CLUE_TURN_DURATION_MS = 25 * 1000;
+const DISCONNECT_GRACE_MS = 2 * 60 * 1000;
 
 function normalizeBasePath(input) {
   const raw = String(input || '').trim();
@@ -62,6 +63,9 @@ const playerRoom = new Map();
 const roomTurnTimers = new Map();
 const roomVoteTimers = new Map();
 const avatarUploads = new Map();
+const sessionToPlayer = new Map();
+const sessionToRoom = new Map();
+const pendingDisconnectBySession = new Map();
 
 const uploadAvatar = multer({
   storage: multer.memoryStorage(),
@@ -169,6 +173,11 @@ function sanitizeBoundedInt(value, min, max, fallback) {
   return parsed;
 }
 
+function sanitizeSessionToken(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 120);
+}
+
 function normalizeWordForCompare(word) {
   return String(word || '')
     .toLowerCase()
@@ -216,10 +225,11 @@ function getRandomDefaultAvatar() {
   return pickRandom(DEFAULT_AVATARS);
 }
 
-function createPlayer(id, name, defaultAvatarUrl) {
+function createPlayer(id, name, defaultAvatarUrl, sessionToken) {
   return {
     id,
     name,
+    sessionToken,
     avatar: {
       type: 'default',
       url: defaultAvatarUrl || getRandomDefaultAvatar(),
@@ -399,6 +409,104 @@ function clearVoteTimer(roomCode) {
     clearTimeout(existing);
     roomVoteTimers.delete(roomCode);
   }
+}
+
+function clearPendingDisconnect(sessionToken) {
+  if (!sessionToken) return;
+  const timer = pendingDisconnectBySession.get(sessionToken);
+  if (timer) {
+    clearTimeout(timer);
+    pendingDisconnectBySession.delete(sessionToken);
+  }
+}
+
+function replaceIdInArray(items, fromId, toId) {
+  return (items || []).map((id) => (id === fromId ? toId : id));
+}
+
+function remapPlayerId(room, fromId, toId) {
+  if (!room || fromId === toId) return false;
+  const player = room.players.get(fromId);
+  if (!player) return false;
+
+  room.players.delete(fromId);
+  player.id = toId;
+  room.players.set(toId, player);
+  room.order = replaceIdInArray(room.order, fromId, toId);
+  room.turnOrder = replaceIdInArray(room.turnOrder, fromId, toId);
+
+  if (room.hostId === fromId) room.hostId = toId;
+
+  if (room.roleById.has(fromId)) {
+    const role = room.roleById.get(fromId);
+    room.roleById.delete(fromId);
+    room.roleById.set(toId, role);
+  }
+
+  if (room.scores.has(fromId)) {
+    const score = room.scores.get(fromId);
+    room.scores.delete(fromId);
+    room.scores.set(toId, score);
+  }
+
+  if (room.eliminatedIds.has(fromId)) {
+    room.eliminatedIds.delete(fromId);
+    room.eliminatedIds.add(toId);
+  }
+
+  if (room.votes.has(fromId)) {
+    const target = room.votes.get(fromId);
+    room.votes.delete(fromId);
+    room.votes.set(toId, target);
+  }
+  for (const [voterId, targetId] of room.votes.entries()) {
+    if (targetId === fromId) {
+      room.votes.set(voterId, toId);
+    }
+  }
+
+  if (room.pendingMisterWhiteGuess?.playerId === fromId) {
+    room.pendingMisterWhiteGuess.playerId = toId;
+  }
+  if (room.lastMisterWhiteGuess?.playerId === fromId) {
+    room.lastMisterWhiteGuess.playerId = toId;
+  }
+
+  if (room.secret) {
+    if (room.secret.undercoverId === fromId) {
+      room.secret.undercoverId = toId;
+    }
+    room.secret.undercoverIds = replaceIdInArray(room.secret.undercoverIds, fromId, toId);
+  }
+
+  if (room.misterWhiteId === fromId) room.misterWhiteId = toId;
+  room.misterWhiteIds = replaceIdInArray(room.misterWhiteIds, fromId, toId);
+  room.loversPair = room.loversPair ? replaceIdInArray(room.loversPair, fromId, toId) : null;
+
+  room.clues = room.clues.map((clue) =>
+    clue.playerId === fromId ? { ...clue, playerId: toId } : clue
+  );
+
+  if (room.result) {
+    if (room.result.undercoverId === fromId) room.result.undercoverId = toId;
+    if (room.result.misterWhiteId === fromId) room.result.misterWhiteId = toId;
+    if (room.result.suspectedId === fromId) room.result.suspectedId = toId;
+    room.result.undercoverIds = replaceIdInArray(room.result.undercoverIds || [], fromId, toId);
+    room.result.misterWhiteIds = replaceIdInArray(room.result.misterWhiteIds || [], fromId, toId);
+    room.result.pointsAwarded = (room.result.pointsAwarded || []).map((award) =>
+      award.playerId === fromId ? { ...award, playerId: toId } : award
+    );
+    room.result.scoreBoard = (room.result.scoreBoard || []).map((score) =>
+      score.playerId === fromId ? { ...score, playerId: toId } : score
+    );
+    room.result.voteBreakdown = (room.result.voteBreakdown || []).map((vote) => ({
+      ...vote,
+      voterId: vote.voterId === fromId ? toId : vote.voterId,
+      targetId: vote.targetId === fromId ? toId : vote.targetId
+    }));
+  }
+
+  return true;
 }
 
 function scheduleTurnTimer(room) {
@@ -923,6 +1031,32 @@ function maybeEndIfNoEvilLeft(room) {
   return true;
 }
 
+function scheduleDisconnectCleanup(socketId) {
+  const roomCode = playerRoom.get(socketId);
+  if (!roomCode) return;
+
+  const room = rooms.get(roomCode);
+  if (!room) return;
+
+  const player = room.players.get(socketId);
+  const sessionToken = sanitizeSessionToken(player?.sessionToken || '');
+  if (!sessionToken) {
+    leaveRoom(socketId);
+    return;
+  }
+
+  clearPendingDisconnect(sessionToken);
+  const timer = setTimeout(() => {
+    const currentSocketId = sessionToPlayer.get(sessionToken);
+    if (currentSocketId) {
+      leaveRoom(currentSocketId);
+    }
+    pendingDisconnectBySession.delete(sessionToken);
+  }, DISCONNECT_GRACE_MS);
+
+  pendingDisconnectBySession.set(sessionToken, timer);
+}
+
 function leaveRoom(socketId) {
   const roomCode = playerRoom.get(socketId);
   if (!roomCode) return;
@@ -932,6 +1066,12 @@ function leaveRoom(socketId) {
   if (!room) return;
 
   const leavingPlayer = room.players.get(socketId);
+  const leavingSessionToken = sanitizeSessionToken(leavingPlayer?.sessionToken || '');
+  clearPendingDisconnect(leavingSessionToken);
+  if (leavingSessionToken) {
+    sessionToPlayer.delete(leavingSessionToken);
+    sessionToRoom.delete(leavingSessionToken);
+  }
   removePlayerUpload(leavingPlayer);
 
   const removedIndex = room.order.indexOf(socketId);
@@ -1003,6 +1143,12 @@ function deleteRoom(roomCode) {
 
   for (const playerId of room.order) {
     const player = room.players.get(playerId);
+    const token = sanitizeSessionToken(player?.sessionToken || '');
+    clearPendingDisconnect(token);
+    if (token) {
+      sessionToPlayer.delete(token);
+      sessionToRoom.delete(token);
+    }
     removePlayerUpload(player);
     playerRoom.delete(playerId);
     io.to(playerId).emit('room:deleted');
@@ -1152,11 +1298,17 @@ io.on('connection', (socket) => {
   socket.on('room:create', (payload, callback = () => {}) => {
     const name = sanitizeName(payload?.name);
     const selectedDefaultAvatar = sanitizeDefaultAvatar(payload?.avatarUrl);
+    const sessionToken = sanitizeSessionToken(payload?.sessionToken) || crypto.randomBytes(24).toString('hex');
     const totalManches = sanitizeBoundedInt(payload?.matchCount, MIN_MANCHES, MAX_MANCHES, DEFAULT_MANCHES);
 
     if (!name) {
       callback({ ok: false, error: 'Invalid name.' });
       return;
+    }
+
+    const existingSocketId = sessionToPlayer.get(sessionToken);
+    if (existingSocketId) {
+      leaveRoom(existingSocketId);
     }
 
     leaveRoom(socket.id);
@@ -1201,27 +1353,36 @@ io.on('connection', (socket) => {
       loversPair: null
     };
 
-    room.players.set(socket.id, createPlayer(socket.id, name, selectedDefaultAvatar));
+    room.players.set(socket.id, createPlayer(socket.id, name, selectedDefaultAvatar, sessionToken));
     room.scores.set(socket.id, 0);
     room.order.push(socket.id);
     reconcileRoleSettings(room);
 
+    clearPendingDisconnect(sessionToken);
+    sessionToPlayer.set(sessionToken, socket.id);
+    sessionToRoom.set(sessionToken, code);
     rooms.set(code, room);
     playerRoom.set(socket.id, code);
     socket.join(code);
 
     emitRoomState(room);
-    callback({ ok: true, roomCode: code, playerId: socket.id });
+    callback({ ok: true, roomCode: code, playerId: socket.id, sessionToken });
   });
 
   socket.on('room:join', (payload, callback = () => {}) => {
     const name = sanitizeName(payload?.name);
     const roomCode = sanitizeRoomCode(payload?.roomCode);
     const selectedDefaultAvatar = sanitizeDefaultAvatar(payload?.avatarUrl);
+    const sessionToken = sanitizeSessionToken(payload?.sessionToken) || crypto.randomBytes(24).toString('hex');
 
     if (!name) {
       callback({ ok: false, error: 'Invalid name.' });
       return;
+    }
+
+    const existingSocketId = sessionToPlayer.get(sessionToken);
+    if (existingSocketId) {
+      leaveRoom(existingSocketId);
     }
 
     const room = rooms.get(roomCode);
@@ -1242,15 +1403,55 @@ io.on('connection', (socket) => {
 
     leaveRoom(socket.id);
 
-    room.players.set(socket.id, createPlayer(socket.id, name, selectedDefaultAvatar));
+    room.players.set(socket.id, createPlayer(socket.id, name, selectedDefaultAvatar, sessionToken));
     room.scores.set(socket.id, 0);
     room.order.push(socket.id);
     reconcileRoleSettings(room);
+    clearPendingDisconnect(sessionToken);
+    sessionToPlayer.set(sessionToken, socket.id);
+    sessionToRoom.set(sessionToken, roomCode);
     playerRoom.set(socket.id, roomCode);
     socket.join(roomCode);
 
     emitRoomState(room);
-    callback({ ok: true, roomCode, playerId: socket.id });
+    callback({ ok: true, roomCode, playerId: socket.id, sessionToken });
+  });
+
+  socket.on('room:resume', (payload, callback = () => {}) => {
+    const sessionToken = sanitizeSessionToken(payload?.sessionToken);
+    if (!sessionToken) {
+      callback({ ok: false, error: 'Invalid session token.' });
+      return;
+    }
+
+    const roomCode = sessionToRoom.get(sessionToken);
+    const previousSocketId = sessionToPlayer.get(sessionToken);
+    if (!roomCode || !previousSocketId) {
+      callback({ ok: false, error: 'No active room for this session.' });
+      return;
+    }
+
+    const room = rooms.get(roomCode);
+    if (!room || !room.players.has(previousSocketId)) {
+      sessionToPlayer.delete(sessionToken);
+      sessionToRoom.delete(sessionToken);
+      callback({ ok: false, error: 'Session expired.' });
+      return;
+    }
+
+    clearPendingDisconnect(sessionToken);
+    if (previousSocketId !== socket.id) {
+      remapPlayerId(room, previousSocketId, socket.id);
+      playerRoom.delete(previousSocketId);
+      playerRoom.set(socket.id, roomCode);
+      sessionToPlayer.set(sessionToken, socket.id);
+    } else {
+      playerRoom.set(socket.id, roomCode);
+    }
+
+    socket.join(roomCode);
+    emitRoomState(room);
+    callback({ ok: true, roomCode, playerId: socket.id, sessionToken });
   });
 
   socket.on('game:start', (callback = () => {}) => {
@@ -1690,7 +1891,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    leaveRoom(socket.id);
+    scheduleDisconnectCleanup(socket.id);
   });
 });
 
