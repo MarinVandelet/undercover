@@ -467,7 +467,7 @@ export default function App() {
     }
     const ack = await emitAck('game:vote', { targetId });
     if (!ack.ok) {
-      setStatus(ack.error || 'Vote refuse.');
+      setStatus(ack.error || 'Vote refusé.');
       return;
     }
     setStatus('Vote enregistre.');

@@ -1377,7 +1377,7 @@ io.on('connection', (socket) => {
       const hasMajority = best > aliveIds.length / 2;
       if (!hasMajority) {
         room.lastVoteMessage =
-          'Personne n a ete elimine car personne n a ete vote majoritairement.';
+          'Personne n\'a été éliminé car personne n\'a été voté majoritairement.';
         startClueRound(room, true);
         scheduleTurnTimer(room);
         emitRoomState(room);

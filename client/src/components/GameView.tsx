@@ -266,7 +266,7 @@ export function GameView({
               </p>
               <p>
                 {!hasUndercover
-                  ? 'Pas d undercover dans cette manche (mode Mister White)'
+                  ? 'Pas d\'undercover dans cette manche (mode Mister White)'
                   : room.result?.undercoverCaught
                     ? 'Undercover demasque'
                     : 'Undercover gagnant'}
