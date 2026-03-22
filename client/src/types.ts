@@ -19,6 +19,9 @@ export type Result = {
   undercoverId: string | null;
   undercoverName: string | null;
   undercoverIds?: string[];
+  misterWhiteId?: string | null;
+  misterWhiteName?: string | null;
+  misterWhiteIds?: string[];
   suspectedId: string | null;
   suspectedName: string | null;
   undercoverCaught: boolean;

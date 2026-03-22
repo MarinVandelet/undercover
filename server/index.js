@@ -617,6 +617,11 @@ function applyRoundPoints(room, eliminatedId, winnerTeam) {
     : room.secret?.undercoverId
       ? [room.secret.undercoverId]
       : [];
+  const misterWhiteIds = Array.isArray(room.misterWhiteIds)
+    ? room.misterWhiteIds
+    : room.misterWhiteId
+      ? [room.misterWhiteId]
+      : [];
   const undercoverSet = new Set(undercoverIds);
   const civilianVotesForEliminatedUndercover = room.order.filter((playerId) => {
     if (undercoverSet.has(playerId)) return false;
@@ -624,6 +629,8 @@ function applyRoundPoints(room, eliminatedId, winnerTeam) {
     return Boolean(votedId && votedId === eliminatedId && undercoverSet.has(votedId));
   });
   const awards = [];
+  const aliveUndercoverIds = undercoverIds.filter((id) => !room.eliminatedIds.has(id));
+  const aliveMisterWhiteIds = misterWhiteIds.filter((id) => !room.eliminatedIds.has(id));
 
   if (eliminatedId && undercoverSet.has(eliminatedId) && civilianVotesForEliminatedUndercover.length > 0) {
     for (const playerId of civilianVotesForEliminatedUndercover) {
@@ -634,13 +641,42 @@ function applyRoundPoints(room, eliminatedId, winnerTeam) {
       });
     }
   } else if (winnerTeam === 'undercovers' && undercoverIds.length > 0) {
-    const aliveUndercoverIds = undercoverIds.filter((id) => !room.eliminatedIds.has(id));
     for (const undercoverId of aliveUndercoverIds) {
       awards.push({
         playerId: undercoverId,
         points: 150,
         reason: 'Undercover gagnant'
       });
+    }
+  }
+
+  if (winnerTeam === 'undercovers' && misterWhiteIds.length > 0) {
+    const aliveCivilianCount = room.order.filter((id) => {
+      if (room.eliminatedIds.has(id)) return false;
+      const role = getRoleOfPlayer(room, id);
+      return role === 'civilian';
+    }).length;
+
+    if (aliveMisterWhiteIds.length > 0 && aliveCivilianCount === 1) {
+      for (const misterWhiteId of aliveMisterWhiteIds) {
+        awards.push({
+          playerId: misterWhiteId,
+          points: 500,
+          reason: 'Mister White gagnant (1v1)'
+        });
+      }
+    }
+
+    // If Undercover and Mister White survive together at end,
+    // Mister White also gets an endgame win bonus.
+    if (aliveCivilianCount === 0 && aliveUndercoverIds.length > 0 && aliveMisterWhiteIds.length > 0) {
+      for (const misterWhiteId of aliveMisterWhiteIds) {
+        awards.push({
+          playerId: misterWhiteId,
+          points: 150,
+          reason: 'Mister White survivant avec Undercover'
+        });
+      }
     }
   }
 
@@ -663,7 +699,13 @@ function concludeGame(room, winnerTeam, eliminatedId, suspectedIds, extraAwards 
     : room.secret?.undercoverId
       ? [room.secret.undercoverId]
       : [];
+  const misterWhiteIds = Array.isArray(room.misterWhiteIds)
+    ? room.misterWhiteIds
+    : room.misterWhiteId
+      ? [room.misterWhiteId]
+      : [];
   const undercoverId = undercoverIds[0] || null;
+  const misterWhiteId = misterWhiteIds[0] || null;
   const pointsAwarded = [...applyRoundPoints(room, eliminatedId, winnerTeam), ...extraAwards];
   if (areOnlyLoversAlive(room)) {
     for (const loverId of room.loversPair) {
@@ -681,6 +723,9 @@ function concludeGame(room, winnerTeam, eliminatedId, suspectedIds, extraAwards 
   const undercoverNames = undercoverIds
     .map((id) => room.players.get(id)?.name || 'Unknown')
     .join(', ');
+  const misterWhiteNames = misterWhiteIds
+    .map((id) => room.players.get(id)?.name || 'Unknown')
+    .join(', ');
   const suspectedName = (suspectedIds || [])
     .map((id) => room.players.get(id)?.name || 'Unknown')
     .join(', ');
@@ -690,12 +735,15 @@ function concludeGame(room, winnerTeam, eliminatedId, suspectedIds, extraAwards 
     undercoverId,
     undercoverName: undercoverNames || 'Aucun',
     undercoverIds,
+    misterWhiteId,
+    misterWhiteName: misterWhiteNames || 'Aucun',
+    misterWhiteIds,
     suspectedId: eliminatedId || null,
     suspectedName: suspectedName || null,
     undercoverCaught: winnerTeam === 'civilians',
     winnerTeam,
     civilianWord: room.secret.civilianWord,
-    undercoverWord: room.secret.undercoverWord,
+    undercoverWord: undercoverIds.length > 0 ? room.secret.undercoverWord : null,
     pointsAwarded,
     scoreBoard: room.order.map((id) => ({
       playerId: id,
@@ -748,16 +796,27 @@ function abortGameIfTooFewPlayers(room) {
     const undercoverNames = undercoverIds
       .map((id) => room.players.get(id)?.name || 'Unknown')
       .join(', ');
+    const misterWhiteIds = Array.isArray(room.misterWhiteIds)
+      ? room.misterWhiteIds
+      : room.misterWhiteId
+        ? [room.misterWhiteId]
+        : [];
+    const misterWhiteNames = misterWhiteIds
+      .map((id) => room.players.get(id)?.name || 'Unknown')
+      .join(', ');
     room.phase = 'ended';
     room.result = {
       undercoverId: undercoverIds[0] || null,
       undercoverName: undercoverNames || null,
       undercoverIds,
+      misterWhiteId: misterWhiteIds[0] || null,
+      misterWhiteName: misterWhiteNames || null,
+      misterWhiteIds,
       suspectedId: null,
       suspectedName: null,
       undercoverCaught: false,
       civilianWord: room.secret?.civilianWord || null,
-      undercoverWord: room.secret?.undercoverWord || null,
+      undercoverWord: undercoverIds.length > 0 ? room.secret?.undercoverWord || null : null,
       reason: 'Game stopped: not enough players.'
     };
   }

@@ -95,8 +95,14 @@ export function GameView({
         <div className="clue-word-hero" aria-live="polite">
           {room.phase === 'ended' ? (
             <div className="result-hero">
-              <p className="undercover-line"><strong>Undercover:</strong> {room.result?.undercoverName || 'Inconnu'}</p>
-              <p className="undercover-line"><strong>Mot undercover:</strong> {room.result?.undercoverWord || '-'}</p>
+              {hasUndercover ? (
+                <>
+                  <p className="undercover-line"><strong>Undercover:</strong> {room.result?.undercoverName || 'Inconnu'}</p>
+                  <p className="undercover-line"><strong>Mot undercover:</strong> {room.result?.undercoverWord || '-'}</p>
+                </>
+              ) : (
+                <p className="undercover-line"><strong>Mister White:</strong> {room.result?.misterWhiteName || 'Aucun'}</p>
+              )}
               <p className="civil-line"><strong>Mot civil:</strong> {room.result?.civilianWord || '-'}</p>
             </div>
           ) : (
