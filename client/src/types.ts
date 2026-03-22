@@ -17,6 +17,7 @@ export type Clue = {
 export type Result = {
   undercoverId: string | null;
   undercoverName: string | null;
+  undercoverIds?: string[];
   suspectedId: string | null;
   suspectedName: string | null;
   undercoverCaught: boolean;
@@ -61,6 +62,10 @@ export type RoomState = {
   canStart: boolean;
   canSubmitClue: boolean;
   isHost: boolean;
+  enableMisterWhite: boolean;
+  enableLovers: boolean;
+  selfIsMisterWhite: boolean;
+  selfLoverName: string | null;
   selfId: string;
   hasVoted: boolean;
   canNextManche: boolean;
@@ -69,7 +74,7 @@ export type RoomState = {
 };
 
 export type RoleInfo = {
-  word: string;
+  word: string | null;
 };
 
 export type Ack = {

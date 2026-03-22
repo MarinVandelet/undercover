@@ -511,6 +511,30 @@ export default function App() {
     setStatus(`Reglages appliques: ${nextMatchCount} manches, ${nextRounds} tours.`);
   }
 
+  async function toggleMisterWhite() {
+    if (!room || !room.isHost || room.phase !== 'lobby') return;
+    const ack = await emitAck('room:updateSpecialRoles', {
+      enableMisterWhite: !room.enableMisterWhite
+    });
+    if (!ack.ok) {
+      setStatus(ack.error || 'Impossible de modifier Mister White.');
+      return;
+    }
+    setStatus(`Mister White ${room.enableMisterWhite ? 'desactive' : 'active'}.`);
+  }
+
+  async function toggleLovers() {
+    if (!room || !room.isHost || room.phase !== 'lobby') return;
+    const ack = await emitAck('room:updateSpecialRoles', {
+      enableLovers: !room.enableLovers
+    });
+    if (!ack.ok) {
+      setStatus(ack.error || 'Impossible de modifier Amoureux.');
+      return;
+    }
+    setStatus(`Amoureux ${room.enableLovers ? 'desactive' : 'active'}.`);
+  }
+
   async function adjustLobbyMatchCount(delta: number) {
     if (!room || !room.isHost || room.phase !== 'lobby') return;
     const nextMatchCount = Math.max(1, Math.min(12, lobbyMatchCount + delta));
@@ -770,6 +794,8 @@ export default function App() {
                   lobbyWordRounds={lobbyWordRounds}
                   onAdjustMatchCount={adjustLobbyMatchCount}
                   onAdjustWordRounds={adjustLobbyWordRounds}
+                  onToggleMisterWhite={toggleMisterWhite}
+                  onToggleLovers={toggleLovers}
                   onApplySettings={applyLobbySettings}
                   onStartGame={startGame}
                 />

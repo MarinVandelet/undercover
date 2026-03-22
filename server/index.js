@@ -105,6 +105,32 @@ function pickRandom(array) {
   return array[Math.floor(Math.random() * array.length)];
 }
 
+function pickRandomDistinct(array, count) {
+  const source = [...array];
+  const picks = [];
+  const safeCount = Math.max(0, Math.min(count, source.length));
+  for (let i = 0; i < safeCount; i += 1) {
+    const index = Math.floor(Math.random() * source.length);
+    picks.push(source[index]);
+    source.splice(index, 1);
+  }
+  return picks;
+}
+
+function getRoleDistribution(playerCount, enableMisterWhite) {
+  if (!enableMisterWhite) {
+    return { misterWhiteCount: 0, undercoverCount: 1 };
+  }
+
+  if (playerCount <= 3) {
+    return { misterWhiteCount: 1, undercoverCount: 0 };
+  }
+  if (playerCount <= 6) {
+    return { misterWhiteCount: 1, undercoverCount: 1 };
+  }
+  return { misterWhiteCount: 1, undercoverCount: 2 };
+}
+
 function pickWordPairForRoom(room) {
   if (!room.usedWordPairIndexes) {
     room.usedWordPairIndexes = new Set();
@@ -287,6 +313,11 @@ function toPublicState(room, requesterId) {
   const canStart = room.phase === 'lobby' && isHost && room.order.length >= 3;
   const canSubmitClue = room.phase === 'clues' && getCurrentSpeakerId(room) === requesterId;
   const requester = room.players.get(requesterId);
+  const selfLoverId =
+    room.loversPair && room.loversPair.includes(requesterId)
+      ? room.loversPair.find((id) => id !== requesterId) || null
+      : null;
+  const selfLoverName = selfLoverId ? room.players.get(selfLoverId)?.name || null : null;
 
   const state = {
     roomCode: room.code,
@@ -310,6 +341,10 @@ function toPublicState(room, requesterId) {
     canStart,
     canSubmitClue,
     isHost,
+    enableMisterWhite: Boolean(room.enableMisterWhite),
+    enableLovers: Boolean(room.enableLovers),
+    selfIsMisterWhite: room.misterWhiteId === requesterId,
+    selfLoverName,
     selfId: requesterId,
     hasVoted: room.votes.has(requesterId),
     selfAvatarExpiresAt: requester?.avatar?.type === 'upload' ? requester.avatar.expiresAt : null,
@@ -335,13 +370,33 @@ function emitRoomState(room) {
 function startGame(room) {
   const pair = pickWordPairForRoom(room);
   if (!pair) return false;
-  const undercoverId = pickRandom(room.order);
   const startingIndex = room.nextStartingIndex % room.order.length;
+  const assignableIds = [...room.order];
+  const distribution = getRoleDistribution(assignableIds.length, Boolean(room.enableMisterWhite));
+  const misterWhiteId =
+    distribution.misterWhiteCount > 0 && assignableIds.length > 0 ? pickRandom(assignableIds) : null;
+  const undercoverPool = assignableIds.filter((id) => id !== misterWhiteId);
+  const undercoverIds = pickRandomDistinct(undercoverPool, distribution.undercoverCount);
+
+  // Safety lock: role counts must strictly match configured distribution.
+  if (undercoverIds.length !== distribution.undercoverCount) {
+    return false;
+  }
+
+  const loverPool = assignableIds.filter((id) => id !== misterWhiteId);
+  let loversPair = null;
+  if (room.enableLovers && loverPool.length >= 2) {
+    const firstLover = pickRandom(loverPool);
+    const secondOptions = loverPool.filter((id) => id !== firstLover);
+    const secondLover = pickRandom(secondOptions);
+    loversPair = [firstLover, secondLover];
+  }
 
   room.phase = 'clues';
   room.round = 1;
   room.roundStartIndex = startingIndex;
   room.currentTurnIndex = startingIndex;
+  room.turnsPlayedInRound = 0;
   room.nextStartingIndex = (startingIndex + 1) % room.order.length;
   room.clues = [];
   room.votes = new Map();
@@ -350,11 +405,15 @@ function startGame(room) {
   room.secret = {
     civilianWord: pair.civilian,
     undercoverWord: pair.undercover,
-    undercoverId
+    undercoverId: undercoverIds[0] || null,
+    undercoverIds
   };
+  room.misterWhiteId = misterWhiteId;
+  room.loversPair = loversPair;
 
   for (const playerId of room.order) {
-    const word = playerId === undercoverId ? pair.undercover : pair.civilian;
+    const isUndercover = undercoverIds.includes(playerId);
+    const word = playerId === misterWhiteId ? null : isUndercover ? pair.undercover : pair.civilian;
     io.to(playerId).emit('game:role', {
       word,
       maxRounds: room.wordRounds
@@ -366,26 +425,36 @@ function startGame(room) {
   return true;
 }
 
-function applyRoundPoints(room, suspectedId, undercoverCaught) {
-  const undercoverId = room.secret.undercoverId;
+function applyRoundPoints(room, undercoverCaught) {
+  const undercoverIds = Array.isArray(room.secret?.undercoverIds)
+    ? room.secret.undercoverIds
+    : room.secret?.undercoverId
+      ? [room.secret.undercoverId]
+      : [];
+  const undercoverSet = new Set(undercoverIds);
+  const civilianVotesForUndercover = room.order.filter((playerId) => {
+    if (undercoverSet.has(playerId)) return false;
+    const votedId = room.votes.get(playerId);
+    return Boolean(votedId && undercoverSet.has(votedId));
+  });
   const awards = [];
 
-  if (undercoverCaught && suspectedId === undercoverId) {
-    for (const playerId of room.order) {
-      if (playerId === undercoverId) continue;
-      if (room.votes.get(playerId) !== undercoverId) continue;
+  if (undercoverCaught && civilianVotesForUndercover.length > 0) {
+    for (const playerId of civilianVotesForUndercover) {
       awards.push({
         playerId,
         points: 100,
         reason: 'Undercover demasque et vote'
       });
     }
-  } else if (undercoverId) {
-    awards.push({
-      playerId: undercoverId,
-      points: 150,
-      reason: 'Undercover gagnant'
-    });
+  } else if (undercoverIds.length > 0) {
+    for (const undercoverId of undercoverIds) {
+      awards.push({
+        playerId: undercoverId,
+        points: 150,
+        reason: 'Undercover gagnant'
+      });
+    }
   }
 
   for (const award of awards) {
@@ -407,25 +476,46 @@ function concludeGame(room) {
     tally.set(targetId, (tally.get(targetId) || 0) + 1);
   }
 
-  let suspectedId = null;
+  const topSuspectedIds = [];
   let best = -1;
   for (const [playerId, count] of tally.entries()) {
     if (count > best) {
       best = count;
-      suspectedId = playerId;
+      topSuspectedIds.length = 0;
+      topSuspectedIds.push(playerId);
+    } else if (count === best) {
+      topSuspectedIds.push(playerId);
     }
   }
+  const suspectedId = topSuspectedIds[0] || null;
 
-  const undercoverId = room.secret.undercoverId;
-  const undercoverCaught = suspectedId === undercoverId;
-  const pointsAwarded = applyRoundPoints(room, suspectedId, undercoverCaught);
+  const undercoverIds = Array.isArray(room.secret?.undercoverIds)
+    ? room.secret.undercoverIds
+    : room.secret?.undercoverId
+      ? [room.secret.undercoverId]
+      : [];
+  const undercoverId = undercoverIds[0] || null;
+  const undercoverSet = new Set(undercoverIds);
+  const undercoverCaught = room.order.some((playerId) => {
+    if (undercoverSet.has(playerId)) return false;
+    const votedId = room.votes.get(playerId);
+    return Boolean(votedId && undercoverSet.has(votedId));
+  });
+  const pointsAwarded = applyRoundPoints(room, undercoverCaught);
+  const undercoverNames = undercoverIds
+    .map((id) => room.players.get(id)?.name || 'Unknown')
+    .join(', ');
+  const suspectedName = topSuspectedIds
+    .map((id) => room.players.get(id)?.name || 'Unknown')
+    .join(', ');
 
   room.phase = 'ended';
   room.result = {
     undercoverId,
-    undercoverName: room.players.get(undercoverId)?.name || 'Unknown',
+    undercoverName: undercoverNames || 'Aucun',
+    undercoverIds,
     suspectedId,
-    suspectedName: suspectedId ? room.players.get(suspectedId)?.name || 'Unknown' : null,
+    suspectedName: suspectedName || null,
     undercoverCaught,
     civilianWord: room.secret.civilianWord,
     undercoverWord: room.secret.undercoverWord,
@@ -447,29 +537,43 @@ function concludeGame(room) {
 }
 
 function advanceTurn(room) {
-  if (room.currentTurnIndex < room.order.length - 1) {
-    room.currentTurnIndex += 1;
+  room.turnsPlayedInRound = (room.turnsPlayedInRound || 0) + 1;
+
+  if (room.turnsPlayedInRound < room.order.length) {
+    room.currentTurnIndex = (room.currentTurnIndex + 1) % room.order.length;
     return;
   }
 
   room.round += 1;
+  room.turnsPlayedInRound = 0;
 
   if (room.round > room.wordRounds) {
     room.phase = 'voting';
     room.currentTurnIndex = 0;
+    room.turnsPlayedInRound = 0;
     return;
   }
 
-  // Rotate the first speaker each word round: P1 -> P2 -> P3 ...
-  room.currentTurnIndex = (room.roundStartIndex + room.round - 1) % room.order.length;
+  // Keep the same speaking order for every clue round in a manche.
+  // The first speaker rotates only when a new manche starts (new word pair).
+  room.currentTurnIndex = room.roundStartIndex;
 }
 
 function abortGameIfTooFewPlayers(room) {
   if (room.order.length < 3 && (room.phase === 'clues' || room.phase === 'voting')) {
+    const undercoverIds = Array.isArray(room.secret?.undercoverIds)
+      ? room.secret.undercoverIds
+      : room.secret?.undercoverId
+        ? [room.secret.undercoverId]
+        : [];
+    const undercoverNames = undercoverIds
+      .map((id) => room.players.get(id)?.name || 'Unknown')
+      .join(', ');
     room.phase = 'ended';
     room.result = {
-      undercoverId: room.secret?.undercoverId || null,
-      undercoverName: room.secret?.undercoverId ? room.players.get(room.secret.undercoverId)?.name || 'Unknown' : null,
+      undercoverId: undercoverIds[0] || null,
+      undercoverName: undercoverNames || null,
+      undercoverIds,
       suspectedId: null,
       suspectedName: null,
       undercoverCaught: false,
@@ -491,6 +595,7 @@ function leaveRoom(socketId) {
   const leavingPlayer = room.players.get(socketId);
   removePlayerUpload(leavingPlayer);
 
+  const removedIndex = room.order.indexOf(socketId);
   room.players.delete(socketId);
   room.order = room.order.filter((id) => id !== socketId);
   room.scores.delete(socketId);
@@ -511,6 +616,25 @@ function leaveRoom(socketId) {
     rooms.delete(roomCode);
     return;
   }
+
+  if (removedIndex !== -1) {
+    if (room.currentTurnIndex > removedIndex) {
+      room.currentTurnIndex -= 1;
+    } else if (room.currentTurnIndex >= room.order.length) {
+      room.currentTurnIndex = 0;
+    }
+
+    if (room.roundStartIndex > removedIndex) {
+      room.roundStartIndex -= 1;
+    } else if (room.roundStartIndex >= room.order.length) {
+      room.roundStartIndex = 0;
+    }
+  }
+
+  room.turnsPlayedInRound = Math.max(
+    0,
+    Math.min(room.turnsPlayedInRound || 0, room.order.length)
+  );
 
   if (room.phase === 'clues') {
     room.turnStartedAt = Date.now();
@@ -712,7 +836,12 @@ io.on('connection', (socket) => {
       totalManches,
       currentManche: 1,
       wordRounds: DEFAULT_WORD_ROUNDS,
-      turnStartedAt: null
+      turnStartedAt: null,
+      turnsPlayedInRound: 0,
+      enableMisterWhite: false,
+      enableLovers: false,
+      misterWhiteId: null,
+      loversPair: null
     };
 
     room.players.set(socket.id, createPlayer(socket.id, name, selectedDefaultAvatar));
@@ -748,7 +877,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (room.order.length >= 12) {
+    if (room.order.length >= 10) {
       callback({ ok: false, error: 'Room is full.' });
       return;
     }
@@ -819,6 +948,36 @@ io.on('connection', (socket) => {
       MAX_WORD_ROUNDS,
       DEFAULT_WORD_ROUNDS
     );
+    emitRoomState(room);
+    callback({ ok: true });
+  });
+
+  socket.on('room:updateSpecialRoles', (payload, callback = () => {}) => {
+    const roomCode = playerRoom.get(socket.id);
+    const room = rooms.get(roomCode);
+
+    if (!room) {
+      callback({ ok: false, error: 'Room not found.' });
+      return;
+    }
+
+    if (room.hostId !== socket.id) {
+      callback({ ok: false, error: 'Only host can update special roles.' });
+      return;
+    }
+
+    if (room.phase !== 'lobby') {
+      callback({ ok: false, error: 'Special roles can only be changed in lobby.' });
+      return;
+    }
+
+    if (typeof payload?.enableMisterWhite === 'boolean') {
+      room.enableMisterWhite = payload.enableMisterWhite;
+    }
+    if (typeof payload?.enableLovers === 'boolean') {
+      room.enableLovers = payload.enableLovers;
+    }
+
     emitRoomState(room);
     callback({ ok: true });
   });
@@ -1001,6 +1160,7 @@ io.on('connection', (socket) => {
     room.phase = 'voting';
     room.currentTurnIndex = 0;
     room.turnStartedAt = null;
+    room.turnsPlayedInRound = 0;
     emitRoomState(room);
     callback({ ok: true });
   });
@@ -1057,7 +1217,10 @@ io.on('connection', (socket) => {
     room.result = null;
     room.usedWordPairIndexes = new Set();
     room.turnStartedAt = null;
+    room.turnsPlayedInRound = 0;
     room.currentManche = room.currentManche >= room.totalManches ? 1 : room.currentManche + 1;
+    room.misterWhiteId = null;
+    room.loversPair = null;
     clearTurnTimer(room.code);
 
     emitRoomState(room);

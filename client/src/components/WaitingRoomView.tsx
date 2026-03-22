@@ -7,6 +7,8 @@ type WaitingRoomViewProps = {
   lobbyWordRounds: number;
   onAdjustMatchCount: (delta: number) => void;
   onAdjustWordRounds: (delta: number) => void;
+  onToggleMisterWhite: () => void;
+  onToggleLovers: () => void;
   onApplySettings: () => void;
   onStartGame: () => void;
 };
@@ -17,9 +19,14 @@ export function WaitingRoomView({
   lobbyWordRounds,
   onAdjustMatchCount,
   onAdjustWordRounds,
+  onToggleMisterWhite,
+  onToggleLovers,
   onApplySettings,
   onStartGame
 }: WaitingRoomViewProps) {
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  const withBase = (pathname: string) => `${baseUrl}${pathname.replace(/^\/+/, '')}`;
+
   return (
     <div className="phase-box">
       <h3>Waiting room</h3>
@@ -75,6 +82,25 @@ export function WaitingRoomView({
             <SlidersHorizontal size={16} />
             <span>Enregistrer les reglages</span>
           </button>
+
+          <div className="special-roles-grid">
+            <button
+              className={`special-role-toggle ${room.enableMisterWhite ? 'active' : ''}`}
+              type="button"
+              onClick={onToggleMisterWhite}
+            >
+              <img src={withBase('/logo_blanc.png')} alt="Mister White" />
+              <span>Mister White</span>
+            </button>
+            <button
+              className={`special-role-toggle ${room.enableLovers ? 'active' : ''}`}
+              type="button"
+              onClick={onToggleLovers}
+            >
+              <img src={withBase('/coeur.png')} alt="Amoureux" />
+              <span>Amoureux</span>
+            </button>
+          </div>
         </div>
       ) : null}
 

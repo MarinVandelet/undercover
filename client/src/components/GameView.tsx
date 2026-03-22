@@ -54,6 +54,9 @@ export function GameView({
 }: GameViewProps) {
   const [selectedVoteId, setSelectedVoteId] = useState('');
   const roundPoints = new Map<string, number>();
+  const hasUndercover =
+    (room.result?.undercoverIds && room.result.undercoverIds.length > 0)
+    || Boolean(room.result?.undercoverId);
   (room.result?.pointsAwarded || []).forEach((award) => {
     roundPoints.set(award.playerId, (roundPoints.get(award.playerId) || 0) + award.points);
   });
@@ -91,7 +94,16 @@ export function GameView({
               <p className="civil-line"><strong>Mot civil:</strong> {room.result?.civilianWord || '-'}</p>
             </div>
           ) : (
-            <span>{roleInfo?.word || '...'}</span>
+            <div className="in-game-role-wrap">
+              {room.selfIsMisterWhite ? (
+                <img className="mister-white-word-logo" src={withBase('/logo_blanc.png')} alt="Mister White" />
+              ) : (
+                <span>{roleInfo?.word || '...'}</span>
+              )}
+              {room.selfLoverName ? (
+                <p className="lovers-hint">Vous etes en couple avec {room.selfLoverName}</p>
+              ) : null}
+            </div>
           )}
         </div>
         <div className="clue-meta">
@@ -207,7 +219,11 @@ export function GameView({
                 Vote final: <strong>{room.result?.suspectedName || 'Aucun'}</strong>
               </p>
               <p>
-                {room.result?.undercoverCaught ? 'Undercover demasque' : 'Undercover gagnant'}
+                {!hasUndercover
+                  ? 'Pas d undercover dans cette manche (mode Mister White)'
+                  : room.result?.undercoverCaught
+                    ? 'Undercover demasque'
+                    : 'Undercover gagnant'}
               </p>
 
               <div className="scoreboard-grid">
