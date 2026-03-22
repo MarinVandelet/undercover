@@ -84,6 +84,7 @@ export type RoomState = {
     correct: boolean;
     targetWord: string;
   } | null;
+  lastVoteMessage: string | null;
   canNextManche: boolean;
   selfAvatarExpiresAt: number | null;
   result?: Result;

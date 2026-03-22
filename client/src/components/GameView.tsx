@@ -182,6 +182,9 @@ export function GameView({
         <div className="clue-input-card">
           {room.phase === 'clues' ? (
             <>
+              {room.lastVoteMessage ? (
+                <p className="mister-white-feedback">{room.lastVoteMessage}</p>
+              ) : null}
               {room.lastMisterWhiteGuess && !room.lastMisterWhiteGuess.correct ? (
                 <p className="mister-white-feedback">
                   Mister White ({room.players.find((p) => p.id === room.lastMisterWhiteGuess?.playerId)?.name || 'Inconnu'})

@@ -510,6 +510,7 @@ function toPublicState(room, requesterId) {
         }
       : null,
     lastMisterWhiteGuess: room.lastMisterWhiteGuess || null,
+    lastVoteMessage: room.lastVoteMessage || null,
     selfAvatarExpiresAt: requester?.avatar?.type === 'upload' ? requester.avatar.expiresAt : null,
     canNextManche:
       room.phase === 'ended' &&
@@ -580,6 +581,7 @@ function startGame(room) {
   room.turnStartedAt = null;
   room.pendingMisterWhiteGuess = null;
   room.lastMisterWhiteGuess = null;
+  room.lastVoteMessage = null;
   room.eliminatedIds = new Set();
   room.roleById = new Map();
   room.secret = {
@@ -1033,6 +1035,7 @@ io.on('connection', (socket) => {
       roleById: new Map(),
       pendingMisterWhiteGuess: null,
       lastMisterWhiteGuess: null,
+      lastVoteMessage: null,
       usedWordPairIndexes: new Set(),
       totalManches,
       currentManche: 1,
@@ -1371,8 +1374,20 @@ io.on('connection', (socket) => {
         }
       }
 
+      const hasMajority = best > aliveIds.length / 2;
+      if (!hasMajority) {
+        room.lastVoteMessage =
+          'Personne n a ete elimine car personne n a ete vote majoritairement.';
+        startClueRound(room, true);
+        scheduleTurnTimer(room);
+        emitRoomState(room);
+        callback({ ok: true });
+        return;
+      }
+
       const eliminatedId = topSuspectedIds[0] || null;
       const eliminatedIds = eliminatedId ? eliminatePlayerWithLover(room, eliminatedId) : [];
+      room.lastVoteMessage = null;
 
       const eliminatedRole = eliminatedId ? getRoleOfPlayer(room, eliminatedId) : null;
       if (eliminatedId && eliminatedRole === 'misterwhite') {
@@ -1425,6 +1440,7 @@ io.on('connection', (socket) => {
     room.turnStartedAt = null;
     room.turnsPlayedInRound = 0;
     room.votes = new Map();
+    room.lastVoteMessage = null;
     emitRoomState(room);
     callback({ ok: true });
   });
@@ -1476,6 +1492,7 @@ io.on('connection', (socket) => {
       targetWord
     };
     room.pendingMisterWhiteGuess = null;
+    room.lastVoteMessage = null;
 
     if (correct) {
       concludeGame(room, 'undercovers', socket.id, [socket.id], bonusAwards);
@@ -1557,6 +1574,7 @@ io.on('connection', (socket) => {
     room.roleById = new Map();
     room.pendingMisterWhiteGuess = null;
     room.lastMisterWhiteGuess = null;
+    room.lastVoteMessage = null;
     room.currentManche = room.currentManche >= room.totalManches ? 1 : room.currentManche + 1;
     room.misterWhiteId = null;
     room.misterWhiteIds = [];
