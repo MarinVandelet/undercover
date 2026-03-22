@@ -470,7 +470,7 @@ export default function App() {
       setStatus(ack.error || 'Vote refusé.');
       return;
     }
-    setStatus('Vote enregistre.');
+    setStatus('Vote enregistré.');
   }
 
   async function submitMisterWhiteGuess(event: FormEvent) {
@@ -480,12 +480,12 @@ export default function App() {
 
     const ack = await emitAck('game:misterWhiteGuess', { word });
     if (!ack.ok) {
-      setStatus(ack.error || 'Mot refuse.');
+      setStatus(ack.error || 'Mot refusé.');
       return;
     }
 
     setMisterWhiteGuessText('');
-    setStatus('Proposition envoyee.');
+    setStatus('Proposition envoyée.');
   }
 
   async function forceVoting() {
@@ -494,7 +494,7 @@ export default function App() {
       setStatus(ack.error || 'Impossible de passer au vote.');
       return;
     }
-    setStatus('Vote force par l hote.');
+    setStatus('Vote forcé par l\'hote.');
   }
 
   async function nextManche() {
@@ -504,7 +504,7 @@ export default function App() {
       return;
     }
     setClueText('');
-    setStatus('Manche suivante lancee.');
+    setStatus('Manche suivante lancée.');
   }
 
   async function applyLobbySettings() {
@@ -516,7 +516,7 @@ export default function App() {
       setStatus(matchAck.error || 'Impossible de modifier les manches.');
       return;
     }
-    setStatus(`Reglages appliques: ${nextMatchCount} manches.`);
+    setStatus(`Reglages appliqués: ${nextMatchCount} manches.`);
   }
 
   async function toggleMisterWhite() {
@@ -529,7 +529,7 @@ export default function App() {
       setStatus(ack.error || 'Impossible de modifier Mister White.');
       return;
     }
-    setStatus(`Mister White ${room.enableMisterWhite ? 'desactive' : 'active'}.`);
+    setStatus(`Mister White ${room.enableMisterWhite ? 'desactivé' : 'active'}.`);
   }
 
   async function toggleLovers() {
@@ -541,7 +541,7 @@ export default function App() {
       setStatus(ack.error || 'Impossible de modifier Amoureux.');
       return;
     }
-    setStatus(`Amoureux ${room.enableLovers ? 'desactive' : 'active'}.`);
+    setStatus(`Amoureux ${room.enableLovers ? 'desactivé' : 'activé'}.`);
   }
 
   async function adjustUndercoverCount(delta: number) {
@@ -552,7 +552,7 @@ export default function App() {
 
     const ack = await emitAck('room:updateSpecialRoles', { undercoverCount: next });
     if (!ack.ok) {
-      setStatus(ack.error || 'Impossible de modifier le nombre d undercovers.');
+      setStatus(ack.error || 'Impossible de modifier le nombre d\'undercovers.');
       return;
     }
     setStatus(`Undercovers: ${next}.`);
@@ -603,7 +603,7 @@ export default function App() {
       setLobbyMatchCount(room.totalManches);
       return;
     }
-    setStatus(`Manches mises a jour: ${nextMatchCount}.`);
+    setStatus(`Manches mises à jour: ${nextMatchCount}.`);
   }
 
   async function backToLobby() {
@@ -633,7 +633,7 @@ export default function App() {
     setRoom(null);
     setRoleInfo(null);
     setClueText('');
-    setStatus('Room supprimee.');
+    setStatus('Room supprimée.');
   }
 
   async function copyRoomCode() {
@@ -705,7 +705,7 @@ export default function App() {
     const preview = URL.createObjectURL(file);
     setPendingUploadFile(file);
     setPendingUploadPreview(preview);
-    setStatus(room ? 'Image prete, upload en cours...' : 'Image prete: upload a l entree dans la room.');
+    setStatus(room ? 'Image prete, upload en cours...' : 'Image prete: upload a l\'entrée dans la room.');
 
     if (room) {
       void uploadAvatarNow(file);

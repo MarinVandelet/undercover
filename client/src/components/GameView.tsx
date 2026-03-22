@@ -226,15 +226,15 @@ export function GameView({
                       type="button"
                       className={`vote-pick-btn ${selectedVoteId === player.id ? 'selected' : ''}`}
                       onClick={() => setSelectedVoteId(player.id)}
-                      disabled={room.hasVoted || player.id === selfId}
+                      disabled={player.id === selfId}
                     >
                       <img className="avatarMini" src={player.avatarUrl} alt={`Avatar ${player.name}`} />
                       <span>{player.name}</span>
                     </button>
                   ))}
               </div>
-              <button className="primary" type="submit" disabled={!selectedVoteId || room.hasVoted || !room.selfIsAlive}>
-                {room.hasVoted ? 'Vote confirme' : 'Confirmer mon vote'}
+              <button className="primary" type="submit" disabled={!selectedVoteId || !room.selfIsAlive}>
+                {room.hasVoted ? 'Changer de vote' : 'Confirmer mon vote'}
               </button>
               {!room.selfIsAlive ? <p>Tu es elimine: tu ne peux plus voter.</p> : null}
             </form>

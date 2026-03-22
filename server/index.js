@@ -60,6 +60,7 @@ const io = new Server(server, {
 const rooms = new Map();
 const playerRoom = new Map();
 const roomTurnTimers = new Map();
+const roomVoteTimers = new Map();
 const avatarUploads = new Map();
 
 const uploadAvatar = multer({
@@ -392,6 +393,14 @@ function clearTurnTimer(roomCode) {
   }
 }
 
+function clearVoteTimer(roomCode) {
+  const existing = roomVoteTimers.get(roomCode);
+  if (existing) {
+    clearTimeout(existing);
+    roomVoteTimers.delete(roomCode);
+  }
+}
+
 function scheduleTurnTimer(room) {
   clearTurnTimer(room.code);
   if (room.phase !== 'clues') return;
@@ -426,6 +435,81 @@ function scheduleTurnTimer(room) {
   }, CLUE_TURN_DURATION_MS);
 
   roomTurnTimers.set(room.code, timer);
+}
+
+function resolveVoting(room) {
+  if (!room || room.phase !== 'voting') return;
+
+  const aliveIds = getAliveIds(room);
+  if (room.votes.size !== aliveIds.length) return;
+
+  const tally = new Map();
+  for (const votedId of room.votes.values()) {
+    tally.set(votedId, (tally.get(votedId) || 0) + 1);
+  }
+
+  const topSuspectedIds = [];
+  let best = -1;
+  for (const [playerId, count] of tally.entries()) {
+    if (count > best) {
+      best = count;
+      topSuspectedIds.length = 0;
+      topSuspectedIds.push(playerId);
+    } else if (count === best) {
+      topSuspectedIds.push(playerId);
+    }
+  }
+
+  const hasMajority = best > aliveIds.length / 2;
+  if (!hasMajority) {
+    room.lastVoteMessage =
+      'Personne n\'a Ã©tÃ© Ã©liminÃ© car personne n\'a Ã©tÃ© votÃ© majoritairement.';
+    startClueRound(room, true);
+    clearVoteTimer(room.code);
+    scheduleTurnTimer(room);
+    emitRoomState(room);
+    return;
+  }
+
+  const eliminatedId = topSuspectedIds[0] || null;
+  const eliminatedIds = eliminatedId ? eliminatePlayerWithLover(room, eliminatedId) : [];
+  room.lastVoteMessage = null;
+  clearVoteTimer(room.code);
+
+  const eliminatedRole = eliminatedId ? getRoleOfPlayer(room, eliminatedId) : null;
+  if (eliminatedId && eliminatedRole === 'misterwhite') {
+    room.phase = 'misterwhite_guess';
+    room.pendingMisterWhiteGuess = { playerId: eliminatedId };
+    room.lastMisterWhiteGuess = null;
+    room.turnStartedAt = null;
+    emitRoomState(room);
+    return;
+  }
+
+  const winnerTeam = findWinnerTeam(room);
+  if (winnerTeam) {
+    concludeGame(room, winnerTeam, eliminatedId, eliminatedIds.length ? eliminatedIds : topSuspectedIds);
+  } else {
+    startClueRound(room, true);
+    scheduleTurnTimer(room);
+    emitRoomState(room);
+  }
+}
+
+function scheduleVoteResolution(room) {
+  clearVoteTimer(room.code);
+  if (!room || room.phase !== 'voting') return;
+
+  const aliveIds = getAliveIds(room);
+  if (room.votes.size !== aliveIds.length) return;
+
+  const timer = setTimeout(() => {
+    const liveRoom = rooms.get(room.code);
+    if (!liveRoom || liveRoom.phase !== 'voting') return;
+    resolveVoting(liveRoom);
+  }, 1200);
+
+  roomVoteTimers.set(room.code, timer);
 }
 
 function toPublicState(room, requesterId) {
@@ -532,6 +616,7 @@ function emitRoomState(room) {
 }
 
 function startGame(room) {
+  clearVoteTimer(room.code);
   reconcileRoleSettings(room);
   const pair = pickWordPairForRoom(room);
   if (!pair) return false;
@@ -694,6 +779,7 @@ function applyRoundPoints(room, eliminatedId, winnerTeam) {
 
 function concludeGame(room, winnerTeam, eliminatedId, suspectedIds, extraAwards = []) {
   clearTurnTimer(room.code);
+  clearVoteTimer(room.code);
   const undercoverIds = Array.isArray(room.secret?.undercoverIds)
     ? room.secret.undercoverIds
     : room.secret?.undercoverId
@@ -868,6 +954,7 @@ function leaveRoom(socketId) {
 
   if (room.order.length === 0) {
     clearTurnTimer(roomCode);
+    clearVoteTimer(roomCode);
     rooms.delete(roomCode);
     return;
   }
@@ -895,6 +982,9 @@ function leaveRoom(socketId) {
     scheduleTurnTimer(room);
   } else {
     clearTurnTimer(room.code);
+    if (room.phase !== 'voting') {
+      clearVoteTimer(room.code);
+    }
   }
 
   abortGameIfTooFewPlayers(room);
@@ -908,6 +998,7 @@ function deleteRoom(roomCode) {
   const room = rooms.get(roomCode);
   if (!room) return;
   clearTurnTimer(roomCode);
+  clearVoteTimer(roomCode);
 
   for (const playerId of room.order) {
     const player = room.players.get(playerId);
@@ -1416,58 +1507,9 @@ io.on('connection', (socket) => {
 
     const aliveIds = getAliveIds(room);
     if (room.votes.size === aliveIds.length) {
-      const tally = new Map();
-      for (const votedId of room.votes.values()) {
-        tally.set(votedId, (tally.get(votedId) || 0) + 1);
-      }
-
-      const topSuspectedIds = [];
-      let best = -1;
-      for (const [playerId, count] of tally.entries()) {
-        if (count > best) {
-          best = count;
-          topSuspectedIds.length = 0;
-          topSuspectedIds.push(playerId);
-        } else if (count === best) {
-          topSuspectedIds.push(playerId);
-        }
-      }
-
-      const hasMajority = best > aliveIds.length / 2;
-      if (!hasMajority) {
-        room.lastVoteMessage =
-          'Personne n\'a été éliminé car personne n\'a été voté majoritairement.';
-        startClueRound(room, true);
-        scheduleTurnTimer(room);
-        emitRoomState(room);
-        callback({ ok: true });
-        return;
-      }
-
-      const eliminatedId = topSuspectedIds[0] || null;
-      const eliminatedIds = eliminatedId ? eliminatePlayerWithLover(room, eliminatedId) : [];
-      room.lastVoteMessage = null;
-
-      const eliminatedRole = eliminatedId ? getRoleOfPlayer(room, eliminatedId) : null;
-      if (eliminatedId && eliminatedRole === 'misterwhite') {
-        room.phase = 'misterwhite_guess';
-        room.pendingMisterWhiteGuess = { playerId: eliminatedId };
-        room.lastMisterWhiteGuess = null;
-        room.turnStartedAt = null;
-        emitRoomState(room);
-        callback({ ok: true });
-        return;
-      }
-
-      const winnerTeam = findWinnerTeam(room);
-      if (winnerTeam) {
-        concludeGame(room, winnerTeam, eliminatedId, eliminatedIds.length ? eliminatedIds : topSuspectedIds);
-      } else {
-        startClueRound(room, true);
-        scheduleTurnTimer(room);
-        emitRoomState(room);
-      }
+      scheduleVoteResolution(room);
     } else {
+      clearVoteTimer(room.code);
       emitRoomState(room);
     }
 
@@ -1500,6 +1542,7 @@ io.on('connection', (socket) => {
     room.turnsPlayedInRound = 0;
     room.votes = new Map();
     room.lastVoteMessage = null;
+    clearVoteTimer(room.code);
     emitRoomState(room);
     callback({ ok: true });
   });
@@ -1639,6 +1682,7 @@ io.on('connection', (socket) => {
     room.misterWhiteIds = [];
     room.loversPair = null;
     clearTurnTimer(room.code);
+    clearVoteTimer(room.code);
 
     emitRoomState(room);
     callback({ ok: true });
