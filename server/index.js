@@ -460,10 +460,11 @@ function resolveVoting(room) {
     }
   }
 
-  const hasMajority = best > aliveIds.length / 2;
-  if (!hasMajority) {
+  const hasUniqueTop = topSuspectedIds.length === 1;
+  const canEliminate = hasUniqueTop && best >= 2;
+  if (!canEliminate) {
     room.lastVoteMessage =
-      'Personne n\'a Ã©tÃ© Ã©liminÃ© car personne n\'a Ã©tÃ© votÃ© majoritairement.';
+      'Personne n\'a ete elimine: aucune personne n\'a eu plus de votes que les autres.';
     startClueRound(room, true);
     clearVoteTimer(room.code);
     scheduleTurnTimer(room);
