@@ -373,7 +373,11 @@ function findWinnerTeam(room) {
     return 'civilians';
   }
 
-  if (aliveEvilCount >= aliveCivilianCount) {
+  // Evil side wins on strict majority, or in the special 1v1 endgame.
+  if (aliveEvilCount > aliveCivilianCount) {
+    return 'undercovers';
+  }
+  if (aliveEvilCount === 1 && aliveCivilianCount === 1) {
     return 'undercovers';
   }
 
@@ -730,7 +734,10 @@ function advanceTurn(room) {
 }
 
 function abortGameIfTooFewPlayers(room) {
-  if (room.order.length < 3 && (room.phase === 'clues' || room.phase === 'voting')) {
+  if (
+    room.order.length < 3
+    && (room.phase === 'clues' || room.phase === 'voting' || room.phase === 'misterwhite_guess')
+  ) {
     const undercoverIds = Array.isArray(room.secret?.undercoverIds)
       ? room.secret.undercoverIds
       : room.secret?.undercoverId
@@ -752,6 +759,20 @@ function abortGameIfTooFewPlayers(room) {
       reason: 'Game stopped: not enough players.'
     };
   }
+}
+
+function maybeEndIfNoEvilLeft(room) {
+  if (!room || (room.phase !== 'clues' && room.phase !== 'voting' && room.phase !== 'misterwhite_guess')) {
+    return false;
+  }
+
+  const winnerTeam = findWinnerTeam(room);
+  if (winnerTeam !== 'civilians') {
+    return false;
+  }
+
+  concludeGame(room, 'civilians', null, []);
+  return true;
 }
 
 function leaveRoom(socketId) {
@@ -816,6 +837,9 @@ function leaveRoom(socketId) {
   }
 
   abortGameIfTooFewPlayers(room);
+  if (room.phase !== 'ended') {
+    maybeEndIfNoEvilLeft(room);
+  }
   emitRoomState(room);
 }
 
