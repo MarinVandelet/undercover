@@ -501,6 +501,26 @@ body {
   background: rgba(31, 211, 163, 0.16);
 }
 
+.vote-actions-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.vote-confirmed-btn {
+  border-radius: 12px;
+  border: 1px solid rgba(92, 126, 179, 0.7);
+  background: rgba(30, 51, 87, 0.6);
+  color: #d7e6ff;
+  min-height: 54px;
+  font-weight: 700;
+  cursor: default;
+}
+
+.vote-change-btn {
+  min-height: 54px;
+}
+
 .round-result-panel h3 {
   margin: 0 0 8px;
   font-size: 1.4rem;

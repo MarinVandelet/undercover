@@ -61,6 +61,7 @@ export function GameView({
   onQuitToHome
 }: GameViewProps) {
   const [selectedVoteId, setSelectedVoteId] = useState('');
+  const [lastConfirmedVoteId, setLastConfirmedVoteId] = useState('');
   const roundPoints = new Map<string, number>();
   const hasUndercover =
     (room.result?.undercoverIds && room.result.undercoverIds.length > 0)
@@ -72,12 +73,14 @@ export function GameView({
   useEffect(() => {
     if (room.phase !== 'voting') {
       setSelectedVoteId('');
+      setLastConfirmedVoteId('');
     }
   }, [room.phase, room.roomCode]);
 
   function submitVote(event: FormEvent) {
     event.preventDefault();
     if (!selectedVoteId) return;
+    setLastConfirmedVoteId(selectedVoteId);
     onVote(selectedVoteId);
   }
 
@@ -237,9 +240,24 @@ export function GameView({
                     </button>
                   ))}
               </div>
-              <button className="primary" type="submit" disabled={!selectedVoteId || !room.selfIsAlive}>
-                {room.hasVoted ? 'Changer de vote' : 'Confirmer mon vote'}
-              </button>
+              {room.hasVoted ? (
+                <div className="vote-actions-split">
+                  <button className="vote-confirmed-btn" type="button" disabled>
+                    Vote confirme
+                  </button>
+                  <button
+                    className="primary vote-change-btn"
+                    type="submit"
+                    disabled={!selectedVoteId || !room.selfIsAlive || selectedVoteId === lastConfirmedVoteId}
+                  >
+                    Changer de vote
+                  </button>
+                </div>
+              ) : (
+                <button className="primary" type="submit" disabled={!selectedVoteId || !room.selfIsAlive}>
+                  Confirmer mon vote
+                </button>
+              )}
               {!room.selfIsAlive ? <p>Tu es elimine: tu ne peux plus voter.</p> : null}
             </form>
           ) : room.phase === 'misterwhite_guess' ? (
