@@ -1,4 +1,4 @@
-﻿const WORD_PAIRS = [
+const WORD_PAIRS = [
   { civilian: 'Chat', undercover: 'Tigre' },
   { civilian: 'Pizza', undercover: 'Lasagne' },
   { civilian: 'Plage', undercover: 'Piscine' },
@@ -19,8 +19,6 @@
   { civilian: 'Chocolat', undercover: 'Vanille' },
   { civilian: 'Montagne', undercover: 'Colline' },
   { civilian: 'Taxi', undercover: 'Bus' },
-
-  // Lieux (faciles)
   { civilian: 'Ecole', undercover: 'College' },
   { civilian: 'Hopital', undercover: 'Clinique' },
   { civilian: 'Supermarche', undercover: 'Epicerie' },
@@ -41,8 +39,6 @@
   { civilian: 'Chateau', undercover: 'Palais' },
   { civilian: 'Temple', undercover: 'Sanctuaire' },
   { civilian: 'Marche', undercover: 'Bazar' },
-
-  // Anime (faciles)
   { civilian: 'Naruto (Perso Anime)', undercover: 'Sasuke (Perso Anime)' },
   { civilian: 'Luffy (Perso Anime)', undercover: 'Zoro (Perso Anime)' },
   { civilian: 'Goku (Perso Anime)', undercover: 'Vegeta (Perso Anime)' },
@@ -126,8 +122,6 @@
   { civilian: 'Sasori (Perso Anime)', undercover: 'Deidara (Perso Anime)' },
   { civilian: 'Kisame (Perso Anime)', undercover: 'Itachi (Perso Anime)' },
   { civilian: 'Kaguya (Perso Anime)', undercover: 'Madara (Perso Anime)' },
-
-  // Titres d anime (categorie dediee)
   { civilian: 'Naruto (Anime)', undercover: 'One Piece (Anime)' },
   { civilian: 'Bleach (Anime)', undercover: 'Fairy Tail (Anime)' },
   { civilian: 'Dragon Ball (Anime)', undercover: 'One Punch Man (Anime)' },
@@ -158,8 +152,6 @@
   { civilian: 'Mushoku Tensei (Anime)', undercover: 'That Time I Got Reincarnated As A Slime (Anime)' },
   { civilian: 'Overlord (Anime)', undercover: 'Log Horizon (Anime)' },
   { civilian: 'Initial D (Anime)', undercover: 'MF Ghost (Anime)' },
-
-  // Lieux d anime (One Piece, Naruto, etc.)
   { civilian: 'Wano', undercover: 'Dressrosa' },
   { civilian: 'Enies Lobby', undercover: 'Marineford' },
   { civilian: 'Whole Cake', undercover: 'Wano' },
@@ -187,8 +179,6 @@
   { civilian: 'UA (Lieu Anime)', undercover: 'Shiketsu (Lieu Anime)' },
   { civilian: 'Kamino (Lieu Anime)', undercover: 'Hosu (Lieu Anime)' },
   { civilian: 'Aincrad', undercover: 'Alfheim' },
-
-  // Dessins animes
   { civilian: 'SpongeBob (Dessin Anime)', undercover: 'Patrick (Dessin Anime)' },
   { civilian: 'Bob L Eponge (Dessin Anime)', undercover: 'Carlo (Dessin Anime)' },
   { civilian: 'Les Simpson (Dessin Anime)', undercover: 'Futurama (Dessin Anime)' },
@@ -262,8 +252,6 @@
   { civilian: 'Dipper (Dessin Anime)', undercover: 'Mabel (Dessin Anime)' },
   { civilian: 'Star Vs The Forces Of Evil (Dessin Anime)', undercover: 'Amphibia (Dessin Anime)' },
   { civilian: 'Les Pyjamasques (Dessin Anime)', undercover: 'Miraculous (Dessin Anime)' },
-
-  // Personnages de dessins animes
   { civilian: 'Bob L Eponge (Personnage)', undercover: 'Patrick (Personnage)' },
   { civilian: 'Carlo (Personnage)', undercover: 'Mr Krabs (Personnage)' },
   { civilian: 'Homer Simpson (Personnage)', undercover: 'Bart Simpson (Personnage)' },
@@ -308,8 +296,6 @@
   { civilian: 'Ruben (Personnage)', undercover: 'Stella Pat Patrouille (Personnage)' },
   { civilian: 'Bluey (Personnage)', undercover: 'Bingo (Personnage)' },
   { civilian: 'Bandit (Personnage)', undercover: 'Chilli (Personnage)' },
-
-  // Techniques anime
   { civilian: 'Rasengan (Technique Anime)', undercover: 'Chidori (Technique Anime)' },
   { civilian: 'Kamehameha (Technique Anime)', undercover: 'Final Flash (Technique Anime)' },
   { civilian: 'Bankai (Technique Anime)', undercover: 'Shikai (Technique Anime)' },
@@ -325,8 +311,6 @@
   { civilian: 'Getsuga Tensho (Technique Anime)', undercover: 'Cero (Technique Anime)' },
   { civilian: 'Susanoo (Technique Anime)', undercover: 'Amaterasu (Technique Anime)' },
   { civilian: 'Multi Clonage (Technique Anime)', undercover: 'Substitution (Technique Anime)' },
-
-  // Films connus
   { civilian: 'Titanic', undercover: 'Avatar' },
   { civilian: 'Avatar', undercover: 'Avengers' },
   { civilian: 'Interstellar', undercover: 'Inception' },
@@ -393,8 +377,6 @@
   { civilian: 'Now You See Me', undercover: 'Le Prestige' },
   { civilian: 'Le Roi Arthur', undercover: 'Robin Des Bois' },
   { civilian: '300', undercover: 'Gladiator' },
-
-  // Personnages connus de films
   { civilian: 'Harry Potter (Perso Film)', undercover: 'Hermione (Perso Film)' },
   { civilian: 'Ron Weasley (Perso Film)', undercover: 'Draco Malfoy (Perso Film)' },
   { civilian: 'Voldemort (Perso Film)', undercover: 'Dumbledore (Perso Film)' },
@@ -425,9 +407,6 @@
   { civilian: 'Deadpool (Perso Film)', undercover: 'Wolverine (Perso Film)' },
   { civilian: 'Rambo (Perso Film)', undercover: 'Rocky (Perso Film)' },
   { civilian: 'Forrest Gump (Perso Film)', undercover: 'Benjamin Button (Perso Film)' },
-
-
-  // Jeux video / personnages connus
   { civilian: 'Mario', undercover: 'Luigi' },
   { civilian: 'Peach', undercover: 'Daisy' },
   { civilian: 'Bowser', undercover: 'Wario' },
@@ -460,8 +439,6 @@
   { civilian: 'FIFA', undercover: 'e Football' },
   { civilian: 'Rocket League', undercover: 'Trackmania' },
   { civilian: 'Roblox', undercover: 'Minecraft' },
-
-  // Series / persos de series tres connus
   { civilian: 'Walter White (Perso Série)', undercover: 'Jesse Pinkman (Perso Série)' },
   { civilian: 'Saul Goodman (Perso Série)', undercover: 'Gus Fring (Perso Série)' },
   { civilian: 'Jon Snow (Perso Série)', undercover: 'Daenerys (Perso Série)' },
@@ -482,8 +459,6 @@
   { civilian: 'Loki (Perso Série)', undercover: 'Sylvie (Perso Série)' },
   { civilian: 'Wednesday (Perso Série)', undercover: 'Enid (Perso Série)' },
   { civilian: 'Lucifer (Perso Série)', undercover: 'Chloe (Perso Série)' },
-
-  // Villes et lieux (supplementaires)
   { civilian: 'Paris (Ville)', undercover: 'Lyon (Ville)' },
   { civilian: 'Marseille (Ville)', undercover: 'Nice (Ville)' },
   { civilian: 'Toulouse (Ville)', undercover: 'Bordeaux (Ville)' },
@@ -514,7 +489,6 @@
   { civilian: 'Hong Kong (Ville)', undercover: 'Taipei (Ville)' },
   { civilian: 'Bangkok (Ville)', undercover: 'Singapour (Ville)' },
   { civilian: 'Sydney (Ville)', undercover: 'Melbourne (Ville)' },
-
   { civilian: 'École', undercover: 'Université' },
   { civilian: 'Hôpital', undercover: 'Clinique' },
   { civilian: 'Pharmacie', undercover: 'Laboratoire' },
@@ -524,17 +498,13 @@
   { civilian: 'Mairie', undercover: 'Préfecture' },
   { civilian: 'Commissariat', undercover: 'Gendarmerie' },
   { civilian: 'Caserne', undercover: 'Base militaire' },
-  { civilian: 'Stade', undercover: 'Gymnase' },
   { civilian: 'Piscine', undercover: 'Patinoire' },
   { civilian: 'Cinéma', undercover: 'Théâtre' },
   { civilian: 'Musée', undercover: 'Galerie' },
-  { civilian: 'Parc', undercover: 'Jardin' },
   { civilian: 'Forêt', undercover: 'Bois' },
-  { civilian: 'Montagne', undercover: 'Colline' },
   { civilian: 'Plage', undercover: 'Crique' },
   { civilian: 'Lac', undercover: 'Étang' },
   { civilian: 'Rivière', undercover: 'Fleuve' },
-  { civilian: 'Port', undercover: 'Marina' },
   { civilian: 'Aéroport', undercover: 'Gare' },
   { civilian: 'Station métro', undercover: 'Arrêt de bus' },
   { civilian: 'Hôtel', undercover: 'Auberge' },
@@ -543,7 +513,6 @@
   { civilian: 'Temple', undercover: 'Église' },
   { civilian: 'Mosquée', undercover: 'Cathédrale' },
   { civilian: 'Marché', undercover: 'Centre commercial' },
-  { civilian: 'Pont', undercover: 'Tunnel' },
   { civilian: 'Île', undercover: 'Péninsule' },
   { civilian: 'Stylo', undercover: 'Crayon' },
   { civilian: 'Gomme', undercover: 'Taille Crayon' },
@@ -565,8 +534,6 @@
   { civilian: 'Parapluie', undercover: 'Kway' },
   { civilian: 'Cle', undercover: 'Serrure' },
   { civilian: 'Pinceau', undercover: 'Rouleau' },
-
-  // Metiers (proches)
   { civilian: 'Pompier', undercover: 'Policier' },
   { civilian: 'Boulanger', undercover: 'Patissier' },
   { civilian: 'Professeur', undercover: 'Instituteur' },
@@ -587,8 +554,6 @@
   { civilian: 'Avocat', undercover: 'Juge' },
   { civilian: 'Banquier', undercover: 'Comptable' },
   { civilian: 'Coiffeur', undercover: 'Barbier' },
-
-  // Nourriture
   { civilian: 'Hamburger', undercover: 'Cheeseburger' },
   { civilian: 'Frites', undercover: 'Potatoes' },
   { civilian: 'Riz', undercover: 'Pates' },
@@ -604,8 +569,6 @@
   { civilian: 'Lait', undercover: 'Creme' },
   { civilian: 'Eau', undercover: 'Jus' },
   { civilian: 'Soda', undercover: 'Limonade' },
-
-  // Animaux
   { civilian: 'Chien', undercover: 'Loup' },
   { civilian: 'Lion', undercover: 'Leopard' },
   { civilian: 'Cheval', undercover: 'Poney' },
@@ -621,8 +584,6 @@
   { civilian: 'Serpent', undercover: 'Iguane' },
   { civilian: 'Abeille', undercover: 'Guêpe' },
   { civilian: 'Papillon', undercover: 'Libellule' },
-
-  // Transports
   { civilian: 'Voiture', undercover: 'Camion' },
   { civilian: 'Scooter', undercover: 'Moto' },
   { civilian: 'Tram', undercover: 'Metro' },
@@ -633,8 +594,6 @@
   { civilian: 'Drone', undercover: 'Helicoptere' },
   { civilian: 'Skate', undercover: 'Trottinette' },
   { civilian: 'Roller', undercover: 'Skate' },
-
-  // Sports
   { civilian: 'Tennis', undercover: 'Padel' },
   { civilian: 'Basket', undercover: 'Handball' },
   { civilian: 'Volley', undercover: 'Badminton' },
@@ -645,8 +604,6 @@
   { civilian: 'Surf', undercover: 'Bodyboard' },
   { civilian: 'Cyclisme', undercover: 'VTT' },
   { civilian: 'Athletisme', undercover: 'Triathlon' },
-
-  // Maison / quotidien
   { civilian: 'Canape', undercover: 'Fauteuil' },
   { civilian: 'Lit', undercover: 'Canape Lit' },
   { civilian: 'Oreiller', undercover: 'Coussin' },
@@ -662,8 +619,6 @@
   { civilian: 'Savon', undercover: 'Shampoing' },
   { civilian: 'Dentifrice', undercover: 'Bain De Bouche' },
   { civilian: 'Serviette', undercover: 'Peignoir' },
-
-  // Vetements / accessoires
   { civilian: 'TShirt', undercover: 'Polo' },
   { civilian: 'Chemise', undercover: 'Blouse' },
   { civilian: 'Jean', undercover: 'Pantalon' },
@@ -676,8 +631,6 @@
   { civilian: 'Lunettes', undercover: 'Lentilles' },
   { civilian: 'Sac', undercover: 'Pochette' },
   { civilian: 'Ceinture', undercover: 'Bretelles' },
-
-  // Tech / internet
   { civilian: 'Google', undercover: 'Bing' },
   { civilian: 'You Tube', undercover: 'Twitch' },
   { civilian: 'Instagram', undercover: 'Tik Tok' },
@@ -688,8 +641,6 @@
   { civilian: 'Windows', undercover: 'Linux' },
   { civilian: 'Android', undercover: 'i OS' },
   { civilian: 'Wi Fi', undercover: '4 G' },
-
-  // Musique / instruments
   { civilian: 'Piano', undercover: 'Synthé' },
   { civilian: 'Violon', undercover: 'Alto' },
   { civilian: 'Batterie', undercover: 'Percussion' },
@@ -700,8 +651,6 @@
   { civilian: 'Album', undercover: 'Single' },
   { civilian: 'Playlist', undercover: 'Mixtape' },
   { civilian: 'Micro', undercover: 'Casque Studio' },
-
-  // Marques
   { civilian: 'Nike', undercover: 'Adidas' },
   { civilian: 'Puma', undercover: 'Reebok' },
   { civilian: 'Lacoste', undercover: 'Ralph Lauren' },
@@ -784,18 +733,11 @@
   { civilian: 'Samsung', undercover: 'Sony' },
   { civilian: 'Bose', undercover: 'JBL' },
   { civilian: 'Sennheiser', undercover: 'Audio Technica' },
-
-  // Réseaux sociaux
-  { civilian: 'Instagram', undercover: 'Tik Tok' },
   { civilian: 'Snapchat', undercover: 'Be Real' },
   { civilian: 'Facebook', undercover: 'X' },
-  { civilian: 'You Tube', undercover: 'Twitch' },
-  { civilian: 'Whats App', undercover: 'Telegram' },
   { civilian: 'Discord', undercover: 'Messenger' },
   { civilian: 'Linked In', undercover: 'Viadeo' },
   { civilian: 'Reddit', undercover: 'Quora' },
-
-  // Series (titres)
   { civilian: 'Breaking Bad (Série)', undercover: 'Better Call Saul (Série)' },
   { civilian: 'Game Of Thrones (Série)', undercover: 'House Of The Dragon (Série)' },
   { civilian: 'Stranger Things (Série)', undercover: 'Dark (Série)' },
@@ -821,8 +763,6 @@
   { civilian: 'The 100 (Série)', undercover: 'Lost (Série)' },
   { civilian: 'Lucifer (Série)', undercover: 'Supernatural (Série)' },
   { civilian: 'Suits (Série)', undercover: 'The Good Wife (Série)' },
-
-  // Series (personnages)
   { civilian: 'Michael Scofield (Perso Série)', undercover: 'Lincoln Burrows (Perso Série)' },
   { civilian: 'Thomas Shelby (Perso Série)', undercover: 'Arthur Shelby (Perso Série)' },
   { civilian: 'Ragnar (Perso Série)', undercover: 'Bjorn (Perso Série)' },
@@ -831,20 +771,15 @@
   { civilian: 'Dustin (Perso Série)', undercover: 'Steve (Perso Série)' },
   { civilian: 'Mike Ross (Perso Série)', undercover: 'Harvey Specter (Perso Série)' },
   { civilian: 'Donna (Perso Série)', undercover: 'Rachel Zane (Perso Série)' },
-  { civilian: 'Lucifer (Perso Série)', undercover: 'Chloe (Perso Série)' },
   { civilian: 'Dean Winchester (Perso Série)', undercover: 'Sam Winchester (Perso Série)' },
   { civilian: 'Rick Grimes (Perso Série)', undercover: 'Daryl (Perso Série)' },
   { civilian: 'Negan (Perso Série)', undercover: 'Governor (Perso Série)' },
-  { civilian: 'Homelander (Perso Série)', undercover: 'Butcher (Perso Série)' },
   { civilian: 'Frenchie (Perso Série)', undercover: 'Mother S Milk (Perso Série)' },
-  { civilian: 'Wednesday (Perso Série)', undercover: 'Enid (Perso Série)' },
   { civilian: 'Joe Goldberg (Perso Série)', undercover: 'Love Quinn (Perso Série)' },
   { civilian: 'Tommy Egan (Perso Série)', undercover: 'Ghost (Perso Série)' },
   { civilian: 'Saul Goodman (Perso Série)', undercover: 'Kim Wexler (Perso Série)' },
   { civilian: 'Omar Little (Perso Série)', undercover: 'Stringer Bell (Perso Série)' },
   { civilian: 'Hank Moody (Perso Série)', undercover: 'Charlie Runkle (Perso Série)' },
-
-  // Appareils tech
   { civilian: 'i Phone (Appareil)', undercover: 'Samsung Galaxy (Appareil)' },
   { civilian: 'i Pad (Appareil)', undercover: 'Tablette Android (Appareil)' },
   { civilian: 'Mac Book (Appareil)', undercover: 'PCPortable (Appareil)' },
@@ -854,8 +789,6 @@
   { civilian: 'Nintendo Switch (Appareil)', undercover: 'Steam Deck (Appareil)' },
   { civilian: 'Alexa (Appareil)', undercover: 'Google Home (Appareil)' },
   { civilian: 'Kindle (Appareil)', undercover: 'Kobo (Appareil)' },
-
-  // Insectes et animaux
   { civilian: 'Fourmi', undercover: 'Termite' },
   { civilian: 'Moustique', undercover: 'Mouche' },
   { civilian: 'Coccinelle', undercover: 'Scarabée' },
@@ -866,8 +799,6 @@
   { civilian: 'Dauphin', undercover: 'Orque' },
   { civilian: 'Panda', undercover: 'Koala' },
   { civilian: 'Loup', undercover: 'Renard' },
-
-  // Boissons
   { civilian: 'Eau', undercover: 'Eau Gazeuse' },
   { civilian: 'Coca', undercover: 'Pepsi' },
   { civilian: 'Fanta', undercover: 'Orangina' },
@@ -878,10 +809,6 @@
   { civilian: 'Limonade', undercover: 'Sprite' },
   { civilian: 'Lait', undercover: 'Lait Amande' },
   { civilian: 'Smoothie', undercover: 'Milkshake' },
-
-  // Fruits et fruits exotiques
-  { civilian: 'Pomme', undercover: 'Poire' },
-  { civilian: 'Fraise', undercover: 'Framboise' },
   { civilian: 'Cerise', undercover: 'Prune' },
   { civilian: 'Raisin', undercover: 'Myrtille' },
   { civilian: 'Banane', undercover: 'Ananas' },
@@ -890,8 +817,6 @@
   { civilian: 'Noix De Coco', undercover: 'Kiwi' },
   { civilian: 'Grenade', undercover: 'Figue' },
   { civilian: 'Pastèque', undercover: 'Melon' },
-
-  // Desserts
   { civilian: 'Tiramisu', undercover: 'Panna Cotta' },
   { civilian: 'Mousse Chocolat', undercover: 'Crème Brûlée' },
   { civilian: 'Éclair', undercover: 'Mille Feuille' },
@@ -902,20 +827,15 @@
   { civilian: 'Donut', undercover: 'Beignet' },
   { civilian: 'Flan', undercover: 'Clafoutis' },
   { civilian: 'Tarte Pomme', undercover: 'Tarte Citron' },
-
-  // Instruments de musique
   { civilian: 'Guitare', undercover: 'Basse' },
   { civilian: 'Piano', undercover: 'Clavier' },
   { civilian: 'Batterie', undercover: 'Cajon' },
   { civilian: 'Violon', undercover: 'Violoncelle' },
-  { civilian: 'Saxophone', undercover: 'Trompette' },
   { civilian: 'Flûte', undercover: 'Clarinette' },
   { civilian: 'Ukulélé', undercover: 'Mandoline' },
   { civilian: 'Harpe', undercover: 'Lyre' },
   { civilian: 'Accordéon', undercover: 'Harmonica' },
   { civilian: 'Djembé', undercover: 'Bongo' },
-
-  // Mythologie
   { civilian: 'Zeus (Mythologie)', undercover: 'Poséidon (Mythologie)' },
   { civilian: 'Hadès (Mythologie)', undercover: 'Arès (Mythologie)' },
   { civilian: 'Athéna (Mythologie)', undercover: 'Artémis (Mythologie)' },
@@ -926,8 +846,6 @@
   { civilian: 'Anubis (Mythologie)', undercover: 'Râ (Mythologie)' },
   { civilian: 'Medusa (Mythologie)', undercover: 'Sphinx (Mythologie)' },
   { civilian: 'Minotaure (Mythologie)', undercover: 'Cyclope (Mythologie)' },
-
-  // Pokémon
   { civilian: 'Pikachu (Pokémon)', undercover: 'Raichu (Pokémon)' },
   { civilian: 'Salamèche (Pokémon)', undercover: 'Reptincel (Pokémon)' },
   { civilian: 'Carapuce (Pokémon)', undercover: 'Carabaffe (Pokémon)' },
@@ -937,8 +855,6 @@
   { civilian: 'Mew (Pokémon)', undercover: 'Mewtwo (Pokémon)' },
   { civilian: 'Rondoudou (Pokémon)', undercover: 'Grodoudou (Pokémon)' },
   { civilian: 'Lucario (Pokémon)', undercover: 'Zoroark (Pokémon)' },
-
-  // Adulte
   { civilian: 'Missionnaire', undercover: 'Levrette' },
   { civilian: 'Fellation', undercover: 'Cunnilingus' },
   { civilian: 'Préliminaires', undercover: 'Pénétration' },
@@ -974,20 +890,12 @@
   { civilian: 'Dirty talk', undercover: 'Talk coquin' },
   { civilian: 'Chambre rouge', undercover: 'Lumière tamisée' },
   { civilian: 'Consentement', undercover: 'Safe word' },
-
-  // Marques de voiture
   { civilian: 'BMW', undercover: 'Audi' },
   { civilian: 'Mercedes', undercover: 'Lexus' },
-  { civilian: 'Ferrari', undercover: 'Lamborghini' },
-  { civilian: 'Porsche', undercover: 'Maserati' },
   { civilian: 'Bugatti', undercover: 'Koenigsegg' },
-  { civilian: 'Tesla', undercover: 'Polestar' },
   { civilian: 'Peugeot', undercover: 'Renault' },
   { civilian: 'Citroen', undercover: 'Fiat' },
-  { civilian: 'Toyota', undercover: 'Honda' },
   { civilian: 'Nissan', undercover: 'Mazda' },
-
-  // Mega pack: +500 paires auto-generees
   { civilian: 'Shigaraki (Perso Anime)', undercover: 'Magna (Perso Anime)' },
   { civilian: 'Twice (Perso Anime)', undercover: 'Maki (Perso Anime)' },
   { civilian: 'Panda (Perso Anime)', undercover: 'Tengen Uzui (Perso Anime)' },
@@ -1036,7 +944,6 @@
   { civilian: 'Kamino (Lieu Anime)', undercover: 'Dressrosa (Lieu Anime)' },
   { civilian: 'Elbaf (Lieu Anime)', undercover: 'Water 7 (Lieu Anime)' },
   { civilian: 'Kamino (Lieu Anime)', undercover: 'Sabaody (Lieu Anime)' },
-  { civilian: 'Walter White (Perso Série)', undercover: 'Jesse Pinkman (Perso Série)' },
   { civilian: 'Gus Fring (Perso Série)', undercover: 'Negan (Perso Série)' },
   { civilian: 'Daenerys (Perso Série)', undercover: 'Michonne (Perso Série)' },
   { civilian: 'Sansa Stark (Perso Série)', undercover: 'Sam Winchester (Perso Série)' },
@@ -1126,7 +1033,6 @@
   { civilian: 'Harry Potter (Perso Film)', undercover: 'Peter Parker (Perso Film)' },
   { civilian: 'Voldemort (Perso Film)', undercover: 'Legolas (Perso Film)' },
   { civilian: 'Thanos (Perso Film)', undercover: 'Dumbledore (Perso Film)' },
-  { civilian: 'Luke Skywalker (Perso Film)', undercover: 'Han Solo (Perso Film)' },
   { civilian: 'Miles Morales (Perso Film)', undercover: 'Luke Skywalker (Perso Film)' },
   { civilian: 'Sauron (Perso Film)', undercover: 'Hermione Granger (Perso Film)' },
   { civilian: 'Indiana Jones (Perso Film)', undercover: 'Morpheus (Perso Film)' },
@@ -1488,8 +1394,6 @@
   { civilian: 'Subaru (Voiture)', undercover: 'Porsche (Voiture)' },
   { civilian: 'Koenigsegg (Voiture)', undercover: 'Citroen (Voiture)' },
   { civilian: 'Dodge (Voiture)', undercover: 'Jeep (Voiture)' },
-
-  // Pack anime supplementaire (pouvoirs, persos, lieux, techniques)
   { civilian: 'Chakra (Naruto)', undercover: 'Senjutsu (Naruto)' },
   { civilian: 'Byakugan (Naruto)', undercover: 'Sharingan (Naruto)' },
   { civilian: 'Mangekyo Sharingan (Naruto)', undercover: 'Rinnegan (Naruto)' },
@@ -2059,8 +1963,6 @@
   { civilian: 'Stay Night (Fate)', undercover: 'Zero (Fate)' },
   { civilian: 'Babylonia (Fate)', undercover: 'Camelot (Fate)' },
   { civilian: 'Avalon (Fate)', undercover: 'Gate of Babylon (Fate)' },
-
-  // Mega pack supplementaire multi-categories (proches et logiques)
   { civilian: 'Couteau (Objet)', undercover: 'Fourchette (Objet)' },
   { civilian: 'Cuillere (Objet)', undercover: 'Louche (Objet)' },
   { civilian: 'Assiette (Objet)', undercover: 'Bol (Objet)' },
@@ -2141,15 +2043,6 @@
   { civilian: 'Cheesecake (Dessert)', undercover: 'Flan (Dessert)' },
   { civilian: 'Beignet (Dessert)', undercover: 'Donut (Dessert)' },
   { civilian: 'Glace vanille (Dessert)', undercover: 'Glace chocolat (Dessert)' },
-  { civilian: 'Paris (Ville)', undercover: 'Lyon (Ville)' },
-  { civilian: 'Marseille (Ville)', undercover: 'Nice (Ville)' },
-  { civilian: 'Londres (Ville)', undercover: 'Manchester (Ville)' },
-  { civilian: 'Tokyo (Ville)', undercover: 'Osaka (Ville)' },
-  { civilian: 'New York (Ville)', undercover: 'Chicago (Ville)' },
-  { civilian: 'Berlin (Ville)', undercover: 'Munich (Ville)' },
-  { civilian: 'Madrid (Ville)', undercover: 'Barcelone (Ville)' },
-  { civilian: 'Rome (Ville)', undercover: 'Milan (Ville)' },
-  { civilian: 'Seoul (Ville)', undercover: 'Busan (Ville)' },
   { civilian: 'Bangkok (Ville)', undercover: 'Phuket (Ville)' },
   { civilian: 'Ecole (Lieu)', undercover: 'College (Lieu)' },
   { civilian: 'Universite (Lieu)', undercover: 'Faculte (Lieu)' },
@@ -2223,22 +2116,16 @@
   { civilian: 'Course a pied (Sport)', undercover: 'Marathon (Sport)' },
   { civilian: 'Sharingan (Naruto)', undercover: 'Byakugan (Naruto)' },
   { civilian: 'Rinnegan (Naruto)', undercover: 'Mangekyo Sharingan (Naruto)' },
-  { civilian: 'Rasengan (Naruto)', undercover: 'Chidori (Naruto)' },
-  { civilian: 'Amaterasu (Naruto)', undercover: 'Tsukuyomi (Naruto)' },
-  { civilian: 'Katon (Naruto)', undercover: 'Suiton (Naruto)' },
   { civilian: 'Nen (Hunter x Hunter)', undercover: 'Chakra (Naruto)' },
   { civilian: 'Hatsu (Hunter x Hunter)', undercover: 'Technique innee (Jujutsu Kaisen)' },
   { civilian: 'Bankai (Bleach)', undercover: 'Shikai (Bleach)' },
   { civilian: 'Geass (Code Geass)', undercover: 'Death Note (Death Note)' },
   { civilian: 'Haki des rois (One Piece)', undercover: 'Haki de l armement (One Piece)' },
-  { civilian: 'Gear 4 (One Piece)', undercover: 'Gear 5 (One Piece)' },
   { civilian: 'Domain Expansion (Jujutsu Kaisen)', undercover: 'Malevolent Shrine (Jujutsu Kaisen)' },
-  { civilian: 'Black Flash (Jujutsu Kaisen)', undercover: 'Hollow Purple (Jujutsu Kaisen)' },
   { civilian: 'Souffle de l eau (Demon Slayer)', undercover: 'Souffle du soleil (Demon Slayer)' },
   { civilian: 'Ultra Instinct (Dragon Ball)', undercover: 'Super Saiyan Blue (Dragon Ball)' },
   { civilian: 'One For All (MHA)', undercover: 'All For One (MHA)' },
   { civilian: 'Titan Assaillant (SNK)', undercover: 'Titan Cuirasse (SNK)' },
-  { civilian: 'Stand (JoJo)', undercover: 'Hamon (JoJo)' },
   { civilian: 'Dragon Slayer (Fairy Tail)', undercover: 'Ice Make (Fairy Tail)' },
   { civilian: 'Poke Ball (Pokemon)', undercover: 'Master Ball (Pokemon)' },
   { civilian: 'Breaking Bad (Serie)', undercover: 'Better Call Saul (Serie)' },
@@ -2306,7 +2193,6 @@
   { civilian: 'Lion (Animal)', undercover: 'Tigre (Animal)' },
   { civilian: 'Panthere (Animal)', undercover: 'Leopard (Animal)' },
   { civilian: 'Cheval (Animal)', undercover: 'Poney (Animal)' },
-  { civilian: 'Vache (Animal)', undercover: 'Taureau (Animal)' },
   { civilian: 'Mouton (Animal)', undercover: 'Chevre (Animal)' },
   { civilian: 'Lapin (Animal)', undercover: 'Lievre (Animal)' },
   { civilian: 'Aigle (Animal)', undercover: 'Faucon (Animal)' },
