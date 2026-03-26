@@ -616,6 +616,16 @@ export default function App() {
     setStatus("Vote skip par l'hote.");
   }
 
+  async function skipManche() {
+    const ack = await emitAck('game:skipManche');
+    if (!ack.ok) {
+      setStatus(ack.error || 'Impossible de passer la manche.');
+      return;
+    }
+    setClueText('');
+    setStatus('Manche passee par l hote.');
+  }
+
   async function nextManche() {
     const ack = await emitAck('game:nextManche');
     if (!ack.ok) {
@@ -912,6 +922,7 @@ export default function App() {
         onVote={vote}
         onForceVoting={forceVoting}
         onSkipVote={skipVote}
+        onSkipManche={skipManche}
         onNextManche={nextManche}
         onBackToLobby={backToLobby}
         audioEnabled={audioEnabled}

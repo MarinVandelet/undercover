@@ -857,6 +857,7 @@ function emitRoomState(room) {
 }
 
 function startGame(room) {
+  clearTurnTimer(room.code);
   clearVoteTimer(room.code);
   reconcileRoleSettings(room);
   const pair = pickWordPairForRoom(room);
@@ -2109,6 +2110,41 @@ io.on('connection', (socket) => {
       callback({ ok: false, error: 'Reglages de roles invalides pour ce nombre de joueurs.' });
       return;
     }
+    callback({ ok: true });
+  });
+
+  socket.on('game:skipManche', (callback = () => {}) => {
+    const roomCode = playerRoom.get(socket.id);
+    const room = rooms.get(roomCode);
+
+    if (!room) {
+      callback({ ok: false, error: 'Room not found.' });
+      return;
+    }
+
+    if (room.hostId !== socket.id) {
+      callback({ ok: false, error: 'Only host can skip manche.' });
+      return;
+    }
+
+    if (room.phase !== 'clues' && room.phase !== 'voting' && room.phase !== 'misterwhite_guess') {
+      callback({ ok: false, error: 'Can only skip manche during game.' });
+      return;
+    }
+
+    if ((room.currentManche || 1) >= (room.totalManches || DEFAULT_MANCHES)) {
+      callback({ ok: false, error: 'Tu es deja a la derniere manche.' });
+      return;
+    }
+
+    room.currentManche += 1;
+    const started = startGame(room);
+    if (!started) {
+      room.currentManche -= 1;
+      callback({ ok: false, error: 'Impossible de passer la manche avec ces reglages.' });
+      return;
+    }
+
     callback({ ok: true });
   });
 

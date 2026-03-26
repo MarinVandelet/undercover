@@ -27,6 +27,7 @@ type GameViewProps = {
   onVote: (targetId: string) => void;
   onForceVoting: () => void;
   onSkipVote: () => void;
+  onSkipManche: () => void;
   onNextManche: () => void;
   onBackToLobby: () => void;
   audioEnabled: boolean;
@@ -54,6 +55,7 @@ export function GameView({
   onVote,
   onForceVoting,
   onSkipVote,
+  onSkipManche,
   onNextManche,
   onBackToLobby,
   audioEnabled,
@@ -151,6 +153,12 @@ export function GameView({
             <button className="force-vote-btn" type="button" onClick={onSkipVote}>
               <FastForward size={16} />
               <span>Skip vote</span>
+            </button>
+          ) : null}
+          {room.isHost && (room.phase === 'clues' || room.phase === 'voting' || room.phase === 'misterwhite_guess') ? (
+            <button className="force-vote-btn" type="button" onClick={onSkipManche}>
+              <FastForward size={16} />
+              <span>Passer la manche</span>
             </button>
           ) : null}
           <div className={`audio-tools ${audioEnabled ? 'is-on' : 'is-off'}`}>
