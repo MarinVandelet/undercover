@@ -370,6 +370,12 @@ body {
   color: #ffd675;
 }
 
+.judge-badge-img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
 .clue-user-card.me {
   color: #f1f7ff;
 }

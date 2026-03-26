@@ -1,4 +1,4 @@
-import { Minus, Plus, Scale, SlidersHorizontal } from 'lucide-react';
+import { Minus, Plus, SlidersHorizontal } from 'lucide-react';
 import type { RoomState } from '../types';
 
 type WaitingRoomViewProps = {
@@ -157,7 +157,7 @@ export function WaitingRoomView({
               type="button"
               onClick={onToggleJudge}
             >
-              <Scale size={20} />
+              <img src={withBase('/juge.png')} alt="Juge" />
               <span>Juge</span>
             </button>
           </div>
