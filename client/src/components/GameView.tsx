@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { FastForward, Volume2, VolumeX } from 'lucide-react';
+import { FastForward, Scale, Volume2, VolumeX } from 'lucide-react';
 import type { Clue, RoomState, RoleInfo } from '../types';
 
 const BASE_URL = import.meta.env.BASE_URL || '/';
@@ -188,7 +188,10 @@ export function GameView({
               key={player.id}
             >
               <img className="clue-player-avatar" src={player.avatarUrl} alt={`Avatar ${player.name}`} />
-              <h3>{player.name}</h3>
+              <h3 className="clue-player-name">
+                <span>{player.name}</span>
+                {player.isJudge ? <Scale size={16} className="judge-badge" aria-label="Juge" /> : null}
+              </h3>
               <div className="clue-user-words">
                 {!player.isAlive ? <p className="empty-word">Eliminé</p> : null}
                 {entries.length === 0 && player.isAlive && <p className="empty-word">Aucun mot</p>}

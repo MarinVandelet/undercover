@@ -5,6 +5,7 @@ export type Player = {
   avatarUrl: string;
   score: number;
   isAlive: boolean;
+  isJudge?: boolean;
 };
 
 export type Clue = {
@@ -69,6 +70,7 @@ export type RoomState = {
   isHost: boolean;
   enableMisterWhite: boolean;
   enableLovers: boolean;
+  enableJudge?: boolean;
   civilianCountSetting: number;
   undercoverCountSetting: number;
   misterWhiteCountSetting: number;

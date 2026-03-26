@@ -337,6 +337,30 @@ function getRoleOfPlayer(room, playerId) {
   return room.roleById?.get(playerId) || 'civilian';
 }
 
+function assignJudgeForManche(room) {
+  if (!room.enableJudge) {
+    room.judgeId = null;
+    return;
+  }
+  room.judgeId = room.order.length > 0 ? pickRandom(room.order) : null;
+}
+
+function ensureJudgeAlive(room) {
+  if (!room.enableJudge) {
+    room.judgeId = null;
+    return;
+  }
+  const aliveIds = getAliveIds(room);
+  if (aliveIds.length === 0) {
+    room.judgeId = null;
+    return;
+  }
+  if (room.judgeId && aliveIds.includes(room.judgeId)) {
+    return;
+  }
+  room.judgeId = pickRandom(aliveIds);
+}
+
 function reconcileRoleSettings(room) {
   if (!room.enableMisterWhite) {
     room.misterWhiteCountSetting = 0;
@@ -539,6 +563,7 @@ function remapPlayerId(room, fromId, toId) {
 
   if (room.misterWhiteId === fromId) room.misterWhiteId = toId;
   room.misterWhiteIds = replaceIdInArray(room.misterWhiteIds, fromId, toId);
+  if (room.judgeId === fromId) room.judgeId = toId;
   room.loversPair = room.loversPair ? replaceIdInArray(room.loversPair, fromId, toId) : null;
 
   room.clues = room.clues.map((clue) =>
@@ -548,6 +573,7 @@ function remapPlayerId(room, fromId, toId) {
   if (room.result) {
     if (room.result.undercoverId === fromId) room.result.undercoverId = toId;
     if (room.result.misterWhiteId === fromId) room.result.misterWhiteId = toId;
+    if (room.result.judgeId === fromId) room.result.judgeId = toId;
     if (room.result.suspectedId === fromId) room.result.suspectedId = toId;
     room.result.undercoverIds = replaceIdInArray(room.result.undercoverIds || [], fromId, toId);
     room.result.misterWhiteIds = replaceIdInArray(room.result.misterWhiteIds || [], fromId, toId);
@@ -626,8 +652,33 @@ function resolveVoting(room) {
     }
   }
 
-  const hasUniqueTop = topSuspectedIds.length === 1;
-  const canEliminate = hasUniqueTop && best >= 2;
+  let hasUniqueTop = topSuspectedIds.length === 1;
+  let canEliminate = hasUniqueTop && best >= 2;
+
+  // Judge tie-break: +1 vote only when there is a tie at top.
+  if (!canEliminate && !hasUniqueTop && room.enableJudge) {
+    ensureJudgeAlive(room);
+    const judgeVote = room.judgeId ? room.votes.get(room.judgeId) : null;
+    if (judgeVote && topSuspectedIds.includes(judgeVote)) {
+      tally.set(judgeVote, (tally.get(judgeVote) || 0) + 1);
+
+      topSuspectedIds.length = 0;
+      best = -1;
+      for (const [playerId, count] of tally.entries()) {
+        if (count > best) {
+          best = count;
+          topSuspectedIds.length = 0;
+          topSuspectedIds.push(playerId);
+        } else if (count === best) {
+          topSuspectedIds.push(playerId);
+        }
+      }
+
+      hasUniqueTop = topSuspectedIds.length === 1;
+      canEliminate = hasUniqueTop && best >= 2;
+    }
+  }
+
   if (!canEliminate) {
     room.lastVoteMessage =
       'Personne n\'a ete elimine: aucune personne n\'a eu plus de votes que les autres.';
@@ -640,6 +691,7 @@ function resolveVoting(room) {
 
   const eliminatedId = topSuspectedIds[0] || null;
   const eliminatedIds = eliminatedId ? eliminatePlayerWithLover(room, eliminatedId) : [];
+  ensureJudgeAlive(room);
   room.lastVoteMessage = null;
   clearVoteTimer(room.code);
 
@@ -699,7 +751,8 @@ function toPublicState(room, requesterId) {
       isHost: room.hostId === id,
       avatarUrl: p.avatar?.url || getRandomDefaultAvatar(),
       score: room.scores.get(id) || 0,
-      isAlive: !room.eliminatedIds?.has(id)
+      isAlive: !room.eliminatedIds?.has(id),
+      isJudge: Boolean(room.enableJudge) && room.phase !== 'lobby' && room.judgeId === id
     };
   });
 
@@ -760,6 +813,7 @@ function toPublicState(room, requesterId) {
     isHost,
     enableMisterWhite: Boolean(room.enableMisterWhite),
     enableLovers: Boolean(room.enableLovers),
+    enableJudge: Boolean(room.enableJudge),
     undercoverCountSetting: room.undercoverCountSetting ?? 1,
     misterWhiteCountSetting: room.misterWhiteCountSetting ?? 0,
     civilianCountSetting: Math.max(
@@ -866,6 +920,7 @@ function startGame(room) {
   room.misterWhiteId = misterWhiteIds[0] || null;
   room.misterWhiteIds = misterWhiteIds;
   room.loversPair = loversPair;
+  assignJudgeForManche(room);
 
   for (const playerId of room.order) {
     const isUndercover = undercoverIds.includes(playerId);
@@ -1214,6 +1269,9 @@ function leaveRoom(socketId) {
   abortGameIfTooFewPlayers(room);
   if (room.phase !== 'ended') {
     maybeEndIfNoEvilLeft(room);
+    if (room.phase !== 'ended') {
+      ensureJudgeAlive(room);
+    }
   }
   emitRoomState(room);
 }
@@ -1432,6 +1490,8 @@ io.on('connection', (socket) => {
       undercoverCountSetting: 1,
       misterWhiteCountSetting: 0,
       enableLovers: false,
+      enableJudge: false,
+      judgeId: null,
       misterWhiteId: null,
       misterWhiteIds: [],
       loversPair: null
@@ -1595,6 +1655,12 @@ io.on('connection', (socket) => {
     }
     if (typeof payload?.enableLovers === 'boolean') {
       room.enableLovers = payload.enableLovers;
+    }
+    if (typeof payload?.enableJudge === 'boolean') {
+      room.enableJudge = payload.enableJudge;
+      if (!room.enableJudge) {
+        room.judgeId = null;
+      }
     }
     reconcileRoleSettings(room);
 
@@ -2059,6 +2125,7 @@ io.on('connection', (socket) => {
     room.misterWhiteId = null;
     room.misterWhiteIds = [];
     room.loversPair = null;
+    room.judgeId = null;
     clearTurnTimer(room.code);
     clearVoteTimer(room.code);
 

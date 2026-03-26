@@ -663,6 +663,18 @@ export default function App() {
     setStatus(`Amoureux ${room.enableLovers ? 'desactivé' : 'activé'}.`);
   }
 
+  async function toggleJudge() {
+    if (!room || !room.isHost || room.phase !== 'lobby') return;
+    const ack = await emitAck('room:updateSpecialRoles', {
+      enableJudge: !room.enableJudge
+    });
+    if (!ack.ok) {
+      setStatus(ack.error || 'Impossible de modifier Juge.');
+      return;
+    }
+    setStatus(`Juge ${room.enableJudge ? 'desactive' : 'active'}.`);
+  }
+
   async function adjustUndercoverCount(delta: number) {
     if (!room || !room.isHost || room.phase !== 'lobby') return;
     const maxUndercover = Math.max(0, room.players.length - room.misterWhiteCountSetting - 1);
@@ -986,6 +998,7 @@ export default function App() {
                   onAdjustMisterWhiteCount={adjustMisterWhiteCount}
                   onToggleMisterWhite={toggleMisterWhite}
                   onToggleLovers={toggleLovers}
+                  onToggleJudge={toggleJudge}
                   onApplySettings={applyLobbySettings}
                   onStartGame={startGame}
                 />
@@ -1036,7 +1049,7 @@ export default function App() {
                         </button>
                         <button
                           type="button"
-                          className="playerIconBtn danger"
+                          className="playerIconBtn playerIconBtnDanger"
                           title="Exclure de la room"
                           onClick={() => kickPlayer(player.id)}
                         >

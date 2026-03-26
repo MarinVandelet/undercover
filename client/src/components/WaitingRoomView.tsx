@@ -1,4 +1,4 @@
-import { Minus, Plus, SlidersHorizontal } from 'lucide-react';
+import { Minus, Plus, Scale, SlidersHorizontal } from 'lucide-react';
 import type { RoomState } from '../types';
 
 type WaitingRoomViewProps = {
@@ -10,6 +10,7 @@ type WaitingRoomViewProps = {
   onAdjustMisterWhiteCount: (delta: number) => void;
   onToggleMisterWhite: () => void;
   onToggleLovers: () => void;
+  onToggleJudge: () => void;
   onApplySettings: () => void;
   onStartGame: () => void;
 };
@@ -23,6 +24,7 @@ export function WaitingRoomView({
   onAdjustMisterWhiteCount,
   onToggleMisterWhite,
   onToggleLovers,
+  onToggleJudge,
   onApplySettings,
   onStartGame
 }: WaitingRoomViewProps) {
@@ -149,6 +151,14 @@ export function WaitingRoomView({
             >
               <img src={withBase('/coeur.png')} alt="Amoureux" />
               <span>Amoureux</span>
+            </button>
+            <button
+              className={`special-role-toggle ${room.enableJudge ? 'active' : ''}`}
+              type="button"
+              onClick={onToggleJudge}
+            >
+              <Scale size={20} />
+              <span>Juge</span>
             </button>
           </div>
         </div>

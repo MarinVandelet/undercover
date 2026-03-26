@@ -359,6 +359,17 @@ body {
   font-size: 1.35rem;
 }
 
+.clue-player-name {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.judge-badge {
+  color: #ffd675;
+}
+
 .clue-user-card.me {
   color: #f1f7ff;
 }
@@ -944,7 +955,7 @@ button:disabled {
 .special-roles-grid {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1017,6 +1028,10 @@ button:disabled {
   background: rgba(9, 15, 28, 0.7);
 }
 
+.playerRow .avatarMini {
+  flex-shrink: 0;
+}
+
 .playerMeta {
   display: flex;
   align-items: baseline;
@@ -1029,6 +1044,7 @@ button:disabled {
   display: inline-flex;
   gap: 8px;
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 .playerIconBtn {
@@ -1042,7 +1058,7 @@ button:disabled {
   justify-content: center;
 }
 
-.playerIconBtn.danger {
+.playerIconBtn.playerIconBtnDanger {
   border-color: rgba(255, 128, 102, 0.7);
   background: rgba(255, 128, 102, 0.14);
 }
