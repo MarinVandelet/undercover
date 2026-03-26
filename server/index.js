@@ -976,6 +976,28 @@ function applyRoundPoints(room, eliminatedId, winnerTeam) {
         reason: 'Undercover gagnant'
       });
     }
+
+    // Lover rule: if a living civilian is in couple with a living undercover
+    // at the end of an undercover win, that civilian also gets the win points.
+    if (room.loversPair && room.loversPair.length === 2) {
+      const [loverA, loverB] = room.loversPair;
+      const pairs = [
+        [loverA, loverB],
+        [loverB, loverA]
+      ];
+      for (const [civilianId, undercoverId] of pairs) {
+        if (room.eliminatedIds.has(civilianId) || room.eliminatedIds.has(undercoverId)) continue;
+        if (getRoleOfPlayer(room, civilianId) !== 'civilian') continue;
+        if (getRoleOfPlayer(room, undercoverId) !== 'undercover') continue;
+        if (!awards.some((award) => award.playerId === civilianId && award.reason === 'Amoureux avec Undercover gagnant')) {
+          awards.push({
+            playerId: civilianId,
+            points: 150,
+            reason: 'Amoureux avec Undercover gagnant'
+          });
+        }
+      }
+    }
   }
 
   if (winnerTeam === 'undercovers' && misterWhiteIds.length > 0) {
