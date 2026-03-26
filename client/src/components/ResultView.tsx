@@ -13,7 +13,7 @@ export function ResultView({ room, onBackToLobby }: ResultViewProps) {
       <h3>Resultat</h3>
       {room.result.reason ? <p>{room.result.reason}</p> : null}
       <p>Undercover: <strong>{room.result.undercoverName || 'Unknown'}</strong></p>
-      <p>Accuse: <strong>{room.result.suspectedName || 'Aucun'}</strong></p>
+      <p>Accusé: <strong>{room.result.suspectedName || 'Aucun'}</strong></p>
       <p>{room.result.undercoverCaught ? 'Victoire civils' : 'Victoire undercover'}</p>
       <p>Mot civil: <strong>{room.result.civilianWord || '-'}</strong></p>
       <p>Mot undercover: <strong>{room.result.undercoverWord || '-'}</strong></p>

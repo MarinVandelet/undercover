@@ -195,6 +195,17 @@ function normalizeWordForCompare(word) {
     .replace(/[^a-z0-9]+/g, '');
 }
 
+function splitNormalizedTokens(text) {
+  const cleaned = String(text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  if (!cleaned) return [];
+  return cleaned.split(/\s+/).filter(Boolean);
+}
+
 function levenshteinDistance(a, b) {
   const m = a.length;
   const n = b.length;
@@ -219,9 +230,37 @@ function isGuessCloseEnough(guess, target) {
   const b = normalizeWordForCompare(target);
   if (!a || !b) return false;
   if (a === b) return true;
+
+  // Accept short/close guesses against the full target.
   const maxLen = Math.max(a.length, b.length);
-  const tolerance = maxLen <= 5 ? 1 : maxLen <= 9 ? 2 : 3;
-  return levenshteinDistance(a, b) <= tolerance;
+  const tolerance = maxLen <= 5 ? 2 : maxLen <= 9 ? 3 : 4;
+  if (levenshteinDistance(a, b) <= tolerance) return true;
+
+  // Ignore category suffixes like "(Pokemon)" and compare against the core word.
+  const targetNoParens = String(target || '').replace(/\([^)]*\)/g, ' ').trim();
+  const bCore = normalizeWordForCompare(targetNoParens);
+  if (bCore && a === bCore) return true;
+  if (bCore) {
+    const coreMaxLen = Math.max(a.length, bCore.length);
+    const coreTolerance = coreMaxLen <= 5 ? 2 : coreMaxLen <= 9 ? 3 : 4;
+    if (levenshteinDistance(a, bCore) <= coreTolerance) return true;
+  }
+
+  // Token-level forgiving match: e.g. "mew" for "Mew (Pokemon)".
+  const tokens = splitNormalizedTokens(targetNoParens);
+  const guessTokens = splitNormalizedTokens(guess);
+  const guessToken = guessTokens[0] || a;
+  if (guessToken.length >= 3) {
+    for (const token of tokens) {
+      if (guessToken === token) return true;
+      if (token.startsWith(guessToken) || guessToken.startsWith(token)) return true;
+      const tokenMaxLen = Math.max(guessToken.length, token.length);
+      const tokenTolerance = tokenMaxLen <= 5 ? 1 : tokenMaxLen <= 9 ? 2 : 3;
+      if (levenshteinDistance(guessToken, token) <= tokenTolerance) return true;
+    }
+  }
+
+  return false;
 }
 
 function sanitizeDefaultAvatar(avatarUrl) {
@@ -1672,6 +1711,70 @@ io.on('connection', (socket) => {
     callback({ ok: true });
   });
 
+  socket.on('room:resetAvatar', (payload, callback = () => {}) => {
+    const roomCode = playerRoom.get(socket.id);
+    const room = rooms.get(roomCode);
+    if (!room) {
+      callback({ ok: false, error: 'Room not found.' });
+      return;
+    }
+
+    if (room.hostId !== socket.id) {
+      callback({ ok: false, error: 'Only host can reset avatars.' });
+      return;
+    }
+
+    if (room.phase !== 'lobby') {
+      callback({ ok: false, error: 'Avatar reset is only available in lobby.' });
+      return;
+    }
+
+    const targetId = typeof payload?.targetId === 'string' ? payload.targetId : '';
+    const target = room.players.get(targetId);
+    if (!target) {
+      callback({ ok: false, error: 'Player not found.' });
+      return;
+    }
+
+    setPlayerDefaultAvatar(target);
+    emitRoomState(room);
+    callback({ ok: true });
+  });
+
+  socket.on('room:kickPlayer', (payload, callback = () => {}) => {
+    const roomCode = playerRoom.get(socket.id);
+    const room = rooms.get(roomCode);
+    if (!room) {
+      callback({ ok: false, error: 'Room not found.' });
+      return;
+    }
+
+    if (room.hostId !== socket.id) {
+      callback({ ok: false, error: 'Only host can kick players.' });
+      return;
+    }
+
+    if (room.phase !== 'lobby') {
+      callback({ ok: false, error: 'Kick is only available in lobby.' });
+      return;
+    }
+
+    const targetId = typeof payload?.targetId === 'string' ? payload.targetId : '';
+    if (!targetId || targetId === socket.id) {
+      callback({ ok: false, error: 'Invalid kick target.' });
+      return;
+    }
+
+    if (!room.players.has(targetId)) {
+      callback({ ok: false, error: 'Player not found.' });
+      return;
+    }
+
+    io.to(targetId).emit('room:kicked');
+    leaveRoom(targetId);
+    callback({ ok: true });
+  });
+
   socket.on('game:clue', (payload, callback = () => {}) => {
     const roomCode = playerRoom.get(socket.id);
     const room = rooms.get(roomCode);
@@ -1790,6 +1893,33 @@ io.on('connection', (socket) => {
     room.votes = new Map();
     room.lastVoteMessage = null;
     clearVoteTimer(room.code);
+    emitRoomState(room);
+    callback({ ok: true });
+  });
+
+  socket.on('game:skipVote', (callback = () => {}) => {
+    const roomCode = playerRoom.get(socket.id);
+    const room = rooms.get(roomCode);
+
+    if (!room) {
+      callback({ ok: false, error: 'Room not found.' });
+      return;
+    }
+
+    if (room.hostId !== socket.id) {
+      callback({ ok: false, error: 'Only host can skip vote.' });
+      return;
+    }
+
+    if (room.phase !== 'voting') {
+      callback({ ok: false, error: 'Can only skip during voting.' });
+      return;
+    }
+
+    clearVoteTimer(room.code);
+    room.lastVoteMessage = 'Vote skip par l hote. Personne n a ete elimine.';
+    startClueRound(room, true);
+    scheduleTurnTimer(room);
     emitRoomState(room);
     callback({ ok: true });
   });

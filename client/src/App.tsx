@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { Copy, DoorOpen, Shuffle, Trash2, Upload } from 'lucide-react';
+import { Copy, DoorOpen, Shuffle, Trash2, Upload, UserX } from 'lucide-react';
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { GameView } from './components/GameView';
@@ -242,14 +242,24 @@ export default function App() {
       setStatus('La room a ete supprimee.');
     }
 
+    function onRoomKicked() {
+      setRoom(null);
+      setRoleInfo(null);
+      setClueText('');
+      setResumeHint(false);
+      setStatus('Tu as ete exclu de la room.');
+    }
+
     socket.on('room:update', onRoomUpdate);
     socket.on('game:role', onRole);
     socket.on('room:deleted', onRoomDeleted);
+    socket.on('room:kicked', onRoomKicked);
 
     return () => {
       socket.off('room:update', onRoomUpdate);
       socket.off('game:role', onRole);
       socket.off('room:deleted', onRoomDeleted);
+      socket.off('room:kicked', onRoomKicked);
     };
   }, []);
 
@@ -597,6 +607,15 @@ export default function App() {
     setStatus('Vote forcé par l\'hote.');
   }
 
+  async function skipVote() {
+    const ack = await emitAck('game:skipVote');
+    if (!ack.ok) {
+      setStatus(ack.error || 'Impossible de skip le vote.');
+      return;
+    }
+    setStatus("Vote skip par l'hote.");
+  }
+
   async function nextManche() {
     const ack = await emitAck('game:nextManche');
     if (!ack.ok) {
@@ -788,6 +807,26 @@ export default function App() {
     }
   }
 
+  async function resetPlayerAvatar(targetId: string) {
+    if (!room || !room.isHost || room.phase !== 'lobby') return;
+    const ack = await emitAck('room:resetAvatar', { targetId });
+    if (!ack.ok) {
+      setStatus(ack.error || 'Impossible de supprimer cette photo.');
+      return;
+    }
+    setStatus('Photo de profil supprimee.');
+  }
+
+  async function kickPlayer(targetId: string) {
+    if (!room || !room.isHost || room.phase !== 'lobby') return;
+    const ack = await emitAck('room:kickPlayer', { targetId });
+    if (!ack.ok) {
+      setStatus(ack.error || 'Impossible d exclure ce joueur.');
+      return;
+    }
+    setStatus('Joueur exclu de la room.');
+  }
+
   function onAvatarFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -807,7 +846,7 @@ export default function App() {
     const preview = URL.createObjectURL(file);
     setPendingUploadFile(file);
     setPendingUploadPreview(preview);
-    setStatus(room ? 'Image prete, upload en cours...' : 'Image prete: upload a l\'entrée dans la room.');
+    setStatus(room ? 'Image prête, upload en cours...' : 'Image prête: upload à l\'entrée dans la room.');
 
     if (room) {
       void uploadAvatarNow(file);
@@ -860,6 +899,7 @@ export default function App() {
         cluesByPlayer={cluesByPlayer}
         onVote={vote}
         onForceVoting={forceVoting}
+        onSkipVote={skipVote}
         onNextManche={nextManche}
         onBackToLobby={backToLobby}
         audioEnabled={audioEnabled}
@@ -980,10 +1020,30 @@ export default function App() {
                 {room.players.map((player) => (
                   <div className={`playerRow ${player.id === selfId ? 'me' : ''}`} key={player.id}>
                     <img className="avatarMini" src={player.avatarUrl} alt={`Avatar ${player.name}`} />
-                    <div>
+                    <div className="playerMeta">
                       <strong>{player.name}</strong>
                       <small>{player.isHost ? 'Host' : 'Player'}</small>
                     </div>
+                    {room.isHost && room.phase === 'lobby' && player.id !== selfId ? (
+                      <div className="playerActions">
+                        <button
+                          type="button"
+                          className="playerIconBtn"
+                          title="Supprimer la photo"
+                          onClick={() => resetPlayerAvatar(player.id)}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="playerIconBtn danger"
+                          title="Exclure de la room"
+                          onClick={() => kickPlayer(player.id)}
+                        >
+                          <UserX size={16} />
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>

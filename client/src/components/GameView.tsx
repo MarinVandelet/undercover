@@ -26,6 +26,7 @@ type GameViewProps = {
   cluesByPlayer: Map<string, Clue[]>;
   onVote: (targetId: string) => void;
   onForceVoting: () => void;
+  onSkipVote: () => void;
   onNextManche: () => void;
   onBackToLobby: () => void;
   audioEnabled: boolean;
@@ -52,6 +53,7 @@ export function GameView({
   cluesByPlayer,
   onVote,
   onForceVoting,
+  onSkipVote,
   onNextManche,
   onBackToLobby,
   audioEnabled,
@@ -83,6 +85,8 @@ export function GameView({
     setLastConfirmedVoteId(selectedVoteId);
     onVote(selectedVoteId);
   }
+  const voteChangePending =
+    room.hasVoted && Boolean(selectedVoteId) && selectedVoteId !== lastConfirmedVoteId;
 
   const densityClass =
     room.players.length <= 4 ? 'density-large' : room.players.length <= 7 ? 'density-medium' : 'density-compact';
@@ -120,7 +124,7 @@ export function GameView({
                 <span>{roleInfo?.word || '...'}</span>
               )}
               {room.selfLoverName ? (
-                <p className="lovers-hint">Vous etes en couple avec {room.selfLoverName}</p>
+                <p className="lovers-hint">Vous êtes en couple avec {room.selfLoverName}</p>
               ) : null}
             </div>
           )}
@@ -141,6 +145,12 @@ export function GameView({
             <button className="force-vote-btn" type="button" onClick={onForceVoting}>
               <FastForward size={16} />
               <span>Passer au vote</span>
+            </button>
+          ) : null}
+          {room.isHost && room.phase === 'voting' ? (
+            <button className="force-vote-btn" type="button" onClick={onSkipVote}>
+              <FastForward size={16} />
+              <span>Skip vote</span>
             </button>
           ) : null}
           <div className={`audio-tools ${audioEnabled ? 'is-on' : 'is-off'}`}>
@@ -180,7 +190,7 @@ export function GameView({
               <img className="clue-player-avatar" src={player.avatarUrl} alt={`Avatar ${player.name}`} />
               <h3>{player.name}</h3>
               <div className="clue-user-words">
-                {!player.isAlive ? <p className="empty-word">Elimine</p> : null}
+                {!player.isAlive ? <p className="empty-word">Eliminé</p> : null}
                 {entries.length === 0 && player.isAlive && <p className="empty-word">Aucun mot</p>}
                 {entries.map((clue) => (
                   <p key={clue.id}>{clue.text}</p>
@@ -204,7 +214,7 @@ export function GameView({
                   {' '}n'a pas trouve le mot.
                 </p>
               ) : null}
-              <p>Indice precedent: {previousClue ? `${previousClue.playerName}: ${previousClue.text}` : 'Aucun'}</p>
+              <p>Indice précédent: {previousClue ? `${previousClue.playerName}: ${previousClue.text}` : 'Aucun'}</p>
               {room.canSubmitClue ? (
                 <form onSubmit={onSubmitClue} className="clue-dock-form">
                   <input
@@ -216,7 +226,7 @@ export function GameView({
                   <button className="primary" type="submit">Envoyer</button>
                 </form>
               ) : !room.selfIsAlive ? (
-                <p>Tu es elimine: tu observes la manche.</p>
+                <p>Tu es eliminé: tu observes la manche.</p>
               ) : (
                 <p>Attends ton tour, passage auto a la fin du chrono.</p>
               )}
@@ -242,11 +252,11 @@ export function GameView({
               </div>
               {room.hasVoted ? (
                 <div className="vote-actions-split">
-                  <button className="vote-confirmed-btn" type="button" disabled>
-                    Vote confirme
+                  <button className="vote-state-btn" type="button" disabled>
+                    {voteChangePending ? 'Vote non confirme' : 'Vote confirme'}
                   </button>
                   <button
-                    className="primary vote-change-btn"
+                    className="primary vote-state-btn vote-change-btn"
                     type="submit"
                     disabled={!selectedVoteId || !room.selfIsAlive || selectedVoteId === lastConfirmedVoteId}
                   >

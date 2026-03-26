@@ -1017,10 +1017,34 @@ button:disabled {
   background: rgba(9, 15, 28, 0.7);
 }
 
-.playerRow > div {
+.playerMeta {
   display: flex;
   align-items: baseline;
   gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.playerActions {
+  display: inline-flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.playerIconBtn {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.playerIconBtn.danger {
+  border-color: rgba(255, 128, 102, 0.7);
+  background: rgba(255, 128, 102, 0.14);
 }
 
 .playerRow.me {
