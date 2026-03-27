@@ -6,6 +6,7 @@ export type Player = {
   score: number;
   isAlive: boolean;
   isJudge?: boolean;
+  isSeer?: boolean;
 };
 
 export type Clue = {
@@ -71,11 +72,15 @@ export type RoomState = {
   enableMisterWhite: boolean;
   enableLovers: boolean;
   enableJudge?: boolean;
+  enableSeer?: boolean;
   civilianCountSetting: number;
   undercoverCountSetting: number;
   misterWhiteCountSetting: number;
   selfIsMisterWhite: boolean;
   selfWord?: string | null;
+  selfIsSeer?: boolean;
+  canUseSeerPower?: boolean;
+  seerInsight?: string | null;
   selfLoverName: string | null;
   selfIsAlive: boolean;
   selfId: string;
@@ -103,6 +108,7 @@ export type RoleInfo = {
 export type Ack = {
   ok: boolean;
   error?: string;
+  message?: string;
   roomCode?: string;
   sessionToken?: string;
 };

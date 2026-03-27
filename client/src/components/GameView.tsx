@@ -30,6 +30,7 @@ type GameViewProps = {
   onSkipManche: () => void;
   onNextManche: () => void;
   onBackToLobby: () => void;
+  onUseSeerPower: (targetId: string) => void;
   audioEnabled: boolean;
   onToggleAudio: () => void;
   audioVolume: number;
@@ -58,6 +59,7 @@ export function GameView({
   onSkipManche,
   onNextManche,
   onBackToLobby,
+  onUseSeerPower,
   audioEnabled,
   onToggleAudio,
   audioVolume,
@@ -66,6 +68,7 @@ export function GameView({
 }: GameViewProps) {
   const [selectedVoteId, setSelectedVoteId] = useState('');
   const [lastConfirmedVoteId, setLastConfirmedVoteId] = useState('');
+  const [selectedSeerTargetId, setSelectedSeerTargetId] = useState('');
   const roundPoints = new Map<string, number>();
   const hasUndercover =
     (room.result?.undercoverIds && room.result.undercoverIds.length > 0)
@@ -80,6 +83,12 @@ export function GameView({
       setLastConfirmedVoteId('');
     }
   }, [room.phase, room.roomCode]);
+
+  useEffect(() => {
+    if (!room.canUseSeerPower) {
+      setSelectedSeerTargetId('');
+    }
+  }, [room.canUseSeerPower, room.roomCode, room.phase]);
 
   function submitVote(event: FormEvent) {
     event.preventDefault();
@@ -127,6 +136,9 @@ export function GameView({
               )}
               {room.selfLoverName ? (
                 <p className="lovers-hint">Vous êtes en couple avec {room.selfLoverName}</p>
+              ) : null}
+              {room.selfIsSeer ? (
+                <p className="seer-hint">Vous etes la voyante 🔮</p>
               ) : null}
             </div>
           )}
@@ -243,6 +255,40 @@ export function GameView({
               ) : (
                 <p>Attends ton tour, passage auto a la fin du chrono.</p>
               )}
+              {room.canUseSeerPower ? (
+                <div className="seer-panel">
+                  <p className="seer-title">Voyante: choisis un joueur avant le premier vote.</p>
+                  <div className="vote-pick-grid">
+                    {room.players
+                      .filter((player) => player.id !== selfId && player.isAlive)
+                      .map((player) => (
+                        <button
+                          key={`seer-${player.id}`}
+                          type="button"
+                          className={`vote-pick-btn ${selectedSeerTargetId === player.id ? 'selected' : ''}`}
+                          onClick={() => setSelectedSeerTargetId(player.id)}
+                        >
+                          <img className="avatarMini" src={player.avatarUrl} alt={`Avatar ${player.name}`} />
+                          <span>{player.name}</span>
+                        </button>
+                      ))}
+                  </div>
+                  <button
+                    className="primary"
+                    type="button"
+                    disabled={!selectedSeerTargetId}
+                    onClick={() => {
+                      if (!selectedSeerTargetId) return;
+                      onUseSeerPower(selectedSeerTargetId);
+                    }}
+                  >
+                    Utiliser voyance
+                  </button>
+                </div>
+              ) : null}
+              {room.selfIsSeer && room.seerInsight ? (
+                <p className="seer-feedback">{room.seerInsight}</p>
+              ) : null}
             </>
           ) : room.phase === 'voting' ? (
             <form onSubmit={submitVote} className="vote-dock-form">

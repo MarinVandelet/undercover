@@ -685,6 +685,27 @@ export default function App() {
     setStatus(`Juge ${room.enableJudge ? 'desactive' : 'active'}.`);
   }
 
+  async function toggleSeer() {
+    if (!room || !room.isHost || room.phase !== 'lobby') return;
+    const ack = await emitAck('room:updateSpecialRoles', {
+      enableSeer: !room.enableSeer
+    });
+    if (!ack.ok) {
+      setStatus(ack.error || 'Impossible de modifier Voyante.');
+      return;
+    }
+    setStatus(`Voyante ${room.enableSeer ? 'desactivee' : 'activee'}.`);
+  }
+
+  async function useSeerPower(targetId: string) {
+    const ack = await emitAck('game:seerCheck', { targetId });
+    if (!ack.ok) {
+      setStatus(ack.error || 'Impossible d utiliser la voyance.');
+      return;
+    }
+    setStatus(ack.message || 'Pouvoir de voyance utilise.');
+  }
+
   async function adjustUndercoverCount(delta: number) {
     if (!room || !room.isHost || room.phase !== 'lobby') return;
     const maxUndercover = Math.max(0, room.players.length - room.misterWhiteCountSetting - 1);
@@ -925,6 +946,7 @@ export default function App() {
         onSkipManche={skipManche}
         onNextManche={nextManche}
         onBackToLobby={backToLobby}
+        onUseSeerPower={useSeerPower}
         audioEnabled={audioEnabled}
         onToggleAudio={toggleAudio}
         audioVolume={audioVolume}
@@ -1010,6 +1032,7 @@ export default function App() {
                   onToggleMisterWhite={toggleMisterWhite}
                   onToggleLovers={toggleLovers}
                   onToggleJudge={toggleJudge}
+                  onToggleSeer={toggleSeer}
                   onApplySettings={applyLobbySettings}
                   onStartGame={startGame}
                 />

@@ -361,6 +361,39 @@ function ensureJudgeAlive(room) {
   room.judgeId = pickRandom(aliveIds);
 }
 
+function assignSeerForManche(room) {
+  if (!room.enableSeer) {
+    room.seerId = null;
+    return;
+  }
+  const misterWhiteSet = new Set(Array.isArray(room.misterWhiteIds) ? room.misterWhiteIds : []);
+  const candidates = room.order.filter((id) => !misterWhiteSet.has(id));
+  room.seerId = candidates.length > 0 ? pickRandom(candidates) : null;
+}
+
+function getPlayerWordForRole(room, playerId) {
+  const role = getRoleOfPlayer(room, playerId);
+  if (role === 'undercover') return room.secret?.undercoverWord || null;
+  if (role === 'civilian') return room.secret?.civilianWord || null;
+  return null;
+}
+
+function ensureSeerValid(room) {
+  if (!room.enableSeer) {
+    room.seerId = null;
+    return;
+  }
+  const aliveIds = getAliveIds(room);
+  const misterWhiteSet = new Set(Array.isArray(room.misterWhiteIds) ? room.misterWhiteIds : []);
+  const candidates = aliveIds.filter((id) => !misterWhiteSet.has(id));
+  if (candidates.length === 0) {
+    room.seerId = null;
+    return;
+  }
+  if (room.seerId && candidates.includes(room.seerId)) return;
+  room.seerId = pickRandom(candidates);
+}
+
 function reconcileRoleSettings(room) {
   if (!room.enableMisterWhite) {
     room.misterWhiteCountSetting = 0;
@@ -564,6 +597,9 @@ function remapPlayerId(room, fromId, toId) {
   if (room.misterWhiteId === fromId) room.misterWhiteId = toId;
   room.misterWhiteIds = replaceIdInArray(room.misterWhiteIds, fromId, toId);
   if (room.judgeId === fromId) room.judgeId = toId;
+  if (room.seerId === fromId) room.seerId = toId;
+  if (room.lastSeerCheck?.seerId === fromId) room.lastSeerCheck.seerId = toId;
+  if (room.lastSeerCheck?.targetId === fromId) room.lastSeerCheck.targetId = toId;
   room.loversPair = room.loversPair ? replaceIdInArray(room.loversPair, fromId, toId) : null;
 
   room.clues = room.clues.map((clue) =>
@@ -752,7 +788,8 @@ function toPublicState(room, requesterId) {
       avatarUrl: p.avatar?.url || getRandomDefaultAvatar(),
       score: room.scores.get(id) || 0,
       isAlive: !room.eliminatedIds?.has(id),
-      isJudge: Boolean(room.enableJudge) && room.phase !== 'lobby' && room.judgeId === id
+      isJudge: Boolean(room.enableJudge) && room.phase !== 'lobby' && room.judgeId === id,
+      isSeer: requesterId === id && Boolean(room.enableSeer) && room.phase !== 'lobby' && room.seerId === id
     };
   });
 
@@ -814,6 +851,7 @@ function toPublicState(room, requesterId) {
     enableMisterWhite: Boolean(room.enableMisterWhite),
     enableLovers: Boolean(room.enableLovers),
     enableJudge: Boolean(room.enableJudge),
+    enableSeer: Boolean(room.enableSeer),
     undercoverCountSetting: room.undercoverCountSetting ?? 1,
     misterWhiteCountSetting: room.misterWhiteCountSetting ?? 0,
     civilianCountSetting: Math.max(
@@ -823,6 +861,18 @@ function toPublicState(room, requesterId) {
     selfIsMisterWhite: Array.isArray(room.misterWhiteIds)
       ? room.misterWhiteIds.includes(requesterId)
       : room.misterWhiteId === requesterId,
+    selfIsSeer: Boolean(room.enableSeer) && room.seerId === requesterId && room.phase !== 'lobby',
+    canUseSeerPower:
+      Boolean(room.enableSeer)
+      && room.phase === 'clues'
+      && room.round === 1
+      && room.seerId === requesterId
+      && !room.seerPowerUsed
+      && !room.eliminatedIds.has(requesterId),
+    seerInsight:
+      room.lastSeerCheck && room.lastSeerCheck.seerId === requesterId
+        ? room.lastSeerCheck.message
+        : null,
     selfWord,
     selfLoverName,
     selfIsAlive: requesterAlive,
@@ -910,6 +960,8 @@ function startGame(room) {
   room.pendingMisterWhiteGuess = null;
   room.lastMisterWhiteGuess = null;
   room.lastVoteMessage = null;
+  room.lastSeerCheck = null;
+  room.seerPowerUsed = false;
   room.eliminatedIds = new Set();
   room.roleById = new Map();
   room.secret = {
@@ -922,6 +974,7 @@ function startGame(room) {
   room.misterWhiteIds = misterWhiteIds;
   room.loversPair = loversPair;
   assignJudgeForManche(room);
+  assignSeerForManche(room);
 
   for (const playerId of room.order) {
     const isUndercover = undercoverIds.includes(playerId);
@@ -1119,6 +1172,7 @@ function advanceTurn(room) {
     room.phase = 'voting';
     room.currentTurnIndex = 0;
     room.turnsPlayedInRound = 0;
+    room.lastSeerCheck = null;
     return;
   }
 
@@ -1133,6 +1187,7 @@ function advanceTurn(room) {
   room.turnsPlayedInRound = 0;
   room.phase = 'voting';
   room.currentTurnIndex = 0;
+  room.lastSeerCheck = null;
 }
 
 function abortGameIfTooFewPlayers(room) {
@@ -1294,6 +1349,7 @@ function leaveRoom(socketId) {
     maybeEndIfNoEvilLeft(room);
     if (room.phase !== 'ended') {
       ensureJudgeAlive(room);
+      ensureSeerValid(room);
     }
   }
   emitRoomState(room);
@@ -1514,7 +1570,11 @@ io.on('connection', (socket) => {
       misterWhiteCountSetting: 0,
       enableLovers: false,
       enableJudge: false,
+      enableSeer: false,
       judgeId: null,
+      seerId: null,
+      seerPowerUsed: false,
+      lastSeerCheck: null,
       misterWhiteId: null,
       misterWhiteIds: [],
       loversPair: null
@@ -1683,6 +1743,14 @@ io.on('connection', (socket) => {
       room.enableJudge = payload.enableJudge;
       if (!room.enableJudge) {
         room.judgeId = null;
+      }
+    }
+    if (typeof payload?.enableSeer === 'boolean') {
+      room.enableSeer = payload.enableSeer;
+      if (!room.enableSeer) {
+        room.seerId = null;
+        room.seerPowerUsed = false;
+        room.lastSeerCheck = null;
       }
     }
     reconcileRoleSettings(room);
@@ -1955,6 +2023,61 @@ io.on('connection', (socket) => {
     callback({ ok: true });
   });
 
+  socket.on('game:seerCheck', (payload, callback = () => {}) => {
+    const roomCode = playerRoom.get(socket.id);
+    const room = rooms.get(roomCode);
+
+    if (!room) {
+      callback({ ok: false, error: 'Room not found.' });
+      return;
+    }
+
+    if (room.phase !== 'clues' || room.round !== 1) {
+      callback({ ok: false, error: 'Pouvoir utilisable uniquement avant le premier vote.' });
+      return;
+    }
+
+    if (!room.enableSeer || room.seerId !== socket.id) {
+      callback({ ok: false, error: 'Tu n es pas la voyante de cette manche.' });
+      return;
+    }
+
+    if (room.seerPowerUsed) {
+      callback({ ok: false, error: 'Pouvoir deja utilise pour cette manche.' });
+      return;
+    }
+
+    if (room.eliminatedIds.has(socket.id)) {
+      callback({ ok: false, error: 'Joueur elimine.' });
+      return;
+    }
+
+    const targetId = typeof payload?.targetId === 'string' ? payload.targetId : '';
+    if (!targetId || !room.players.has(targetId) || room.eliminatedIds.has(targetId) || targetId === socket.id) {
+      callback({ ok: false, error: 'Cible invalide.' });
+      return;
+    }
+
+    const myWord = getPlayerWordForRole(room, socket.id);
+    const targetWord = getPlayerWordForRole(room, targetId);
+    const sameWord = Boolean(myWord && targetWord && myWord === targetWord);
+    const targetName = room.players.get(targetId)?.name || 'Ce joueur';
+    const message = sameWord
+      ? `${targetName} a le meme mot que vous.`
+      : `${targetName} n'a pas le meme mot que vous.`;
+
+    room.seerPowerUsed = true;
+    room.lastSeerCheck = {
+      seerId: socket.id,
+      targetId,
+      sameWord,
+      message
+    };
+
+    emitRoomState(room);
+    callback({ ok: true, message });
+  });
+
   socket.on('game:forceVoting', (callback = () => {}) => {
     const roomCode = playerRoom.get(socket.id);
     const room = rooms.get(roomCode);
@@ -1981,6 +2104,7 @@ io.on('connection', (socket) => {
     room.turnsPlayedInRound = 0;
     room.votes = new Map();
     room.lastVoteMessage = null;
+    room.lastSeerCheck = null;
     clearVoteTimer(room.code);
     emitRoomState(room);
     callback({ ok: true });
@@ -2184,6 +2308,9 @@ io.on('connection', (socket) => {
     room.misterWhiteIds = [];
     room.loversPair = null;
     room.judgeId = null;
+    room.seerId = null;
+    room.seerPowerUsed = false;
+    room.lastSeerCheck = null;
     clearTurnTimer(room.code);
     clearVoteTimer(room.code);
 

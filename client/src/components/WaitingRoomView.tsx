@@ -11,6 +11,7 @@ type WaitingRoomViewProps = {
   onToggleMisterWhite: () => void;
   onToggleLovers: () => void;
   onToggleJudge: () => void;
+  onToggleSeer: () => void;
   onApplySettings: () => void;
   onStartGame: () => void;
 };
@@ -25,6 +26,7 @@ export function WaitingRoomView({
   onToggleMisterWhite,
   onToggleLovers,
   onToggleJudge,
+  onToggleSeer,
   onApplySettings,
   onStartGame
 }: WaitingRoomViewProps) {
@@ -159,6 +161,16 @@ export function WaitingRoomView({
             >
               <img src={withBase('/juge.png')} alt="Juge" />
               <span>Juge</span>
+            </button>
+          </div>
+          <div className="special-roles-grid special-roles-grid-secondary">
+            <button
+              className={`special-role-toggle ${room.enableSeer ? 'active' : ''}`}
+              type="button"
+              onClick={onToggleSeer}
+            >
+              <img src={withBase('/boulemagique.png')} alt="Voyante" />
+              <span>Voyante</span>
             </button>
           </div>
         </div>

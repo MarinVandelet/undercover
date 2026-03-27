@@ -303,6 +303,13 @@ body {
   font-weight: 700;
 }
 
+.seer-hint {
+  margin: 0 !important;
+  font-size: clamp(0.95rem, 2.2vw, 1.15rem);
+  color: #b48cff !important;
+  font-weight: 700;
+}
+
 .result-hero {
   display: grid;
   gap: 6px;
@@ -482,6 +489,23 @@ body {
 
 .mister-white-feedback {
   color: #ffbf80 !important;
+  font-weight: 700;
+}
+
+.seer-panel {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.seer-title {
+  margin: 0;
+  color: #bcd0f3 !important;
+}
+
+.seer-feedback {
+  margin-top: 10px !important;
+  color: #7ff0cf !important;
   font-weight: 700;
 }
 
@@ -963,6 +987,14 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.special-roles-grid-secondary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.special-roles-grid-secondary .special-role-toggle {
+  grid-column: 1 / 2;
 }
 
 .special-role-toggle {
