@@ -2256,15 +2256,15 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if ((room.currentManche || 1) >= (room.totalManches || DEFAULT_MANCHES)) {
-      callback({ ok: false, error: 'Tu es deja a la derniere manche.' });
-      return;
+    const isLastManche = (room.currentManche || 1) >= (room.totalManches || DEFAULT_MANCHES);
+    if (!isLastManche) {
+      room.currentManche += 1;
     }
-
-    room.currentManche += 1;
     const started = startGame(room);
     if (!started) {
-      room.currentManche -= 1;
+      if (!isLastManche) {
+        room.currentManche -= 1;
+      }
       callback({ ok: false, error: 'Impossible de passer la manche avec ces reglages.' });
       return;
     }
